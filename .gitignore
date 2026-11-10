@@ -17,3 +17,5 @@ wheels/
 htmlcov/
 .env
 .envrc
+
+/docs
