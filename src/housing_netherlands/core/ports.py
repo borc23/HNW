@@ -1,0 +1,81 @@
+"""Ports: the interfaces core code depends on. Adapters implement them; `wiring` picks which."""
+
+from typing import Any, Protocol, runtime_checkable
+
+from housing_netherlands.core.models import (
+    FetchedListing,
+    JobStatus,
+    Listing,
+    ListingSummary,
+    ListingView,
+    LLMMessage,
+    LLMResponse,
+)
+
+
+@runtime_checkable
+class JobQueue(Protocol):
+    async def enqueue(self, job_name: str, payload: dict[str, Any], *, job_id: str) -> None:
+        """Queue `job_name` with `payload`. `job_id` is the correlation id used in logs."""
+        ...
+
+
+@runtime_checkable
+class BlobStore(Protocol):
+    async def put(self, key: str, data: bytes, content_type: str) -> None: ...
+
+    async def get(self, key: str) -> bytes: ...
+
+
+@runtime_checkable
+class LLMClient(Protocol):
+    async def complete(
+        self,
+        messages: list[LLMMessage],
+        *,
+        model: str,
+        json_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        """Return the raw completion text. Callers validate structured output themselves."""
+        ...
+
+
+@runtime_checkable
+class SourceAdapter(Protocol):
+    name: str
+
+    def can_handle(self, url: str) -> bool: ...
+
+    async def fetch(self, url: str) -> FetchedListing: ...
+
+
+@runtime_checkable
+class ListingRepository(Protocol):
+    async def upsert_listing(self, listing: Listing, *, raw_blob_key: str) -> int:
+        """Insert or refresh a listing (unique on source + url); return its id."""
+        ...
+
+    async def find_enrichment(
+        self, listing_id: int, *, prompt_version: str, content_hash: str
+    ) -> ListingSummary | None: ...
+
+    async def save_enrichment(
+        self,
+        listing_id: int,
+        *,
+        prompt_version: str,
+        content_hash: str,
+        model: str,
+        output: ListingSummary,
+    ) -> None: ...
+
+    async def list_listings(self, *, limit: int = 50) -> list[ListingView]: ...
+
+
+@runtime_checkable
+class JobLog(Protocol):
+    async def record(
+        self, job_id: str, *, job_type: str, status: JobStatus, error: str | None = None
+    ) -> None:
+        """Create or update the `jobs_log` row for `job_id`."""
+        ...
