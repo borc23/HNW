@@ -27,12 +27,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     queue_backend: Literal["redis"] = "redis"
 
-    # Object storage (S3 API: MinIO locally, S3 / R2 later)
-    storage_endpoint: str | None = "http://localhost:9000"
+    # Object storage (S3 API: SeaweedFS locally, S3 / R2 later)
+    storage_endpoint: str | None = "http://localhost:8333"
     storage_bucket: str = "housing-raw"
     storage_region: str = "us-east-1"
-    storage_access_key: SecretStr = SecretStr("minioadmin")
-    storage_secret_key: SecretStr = SecretStr("minioadmin")
+    storage_access_key: SecretStr = SecretStr("housing")
+    storage_secret_key: SecretStr = SecretStr("housing-secret")
 
     llm_model_extract: str = "ollama_chat/qwen3.5:4b"
     llm_api_base: str | None = "http://localhost:11434"
