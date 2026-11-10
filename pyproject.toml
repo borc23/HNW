@@ -1,7 +1,7 @@
 [project]
 name = "housing-netherlands"
 version = "0.1.0"
-description = "Add your description here"
+description = "Personal housing dashboard for the Dutch rental market."
 readme = "README.md"
 authors = [
     { name = "Bor Cerne", email = "borc23@gmail.com" }
@@ -21,6 +21,45 @@ dev = [
     "notebook>=7.6.5",
     "pre-commit>=4.7.0",
     "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.4",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "UP",    # pyupgrade
+    "SIM",   # flake8-simplify
+    "ASYNC", # flake8-async
+    "RUF",   # ruff-specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: needs the Docker Compose stack (postgres, redis, minio); deselect with -m 'not integration'",
+]
+
+[tool.coverage.run]
+source = ["housing_netherlands"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
