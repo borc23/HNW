@@ -10,4 +10,11 @@ uv run pre-commit install
 uv run pytest -m "not integration"
 ```
 
+Local stack (Postgres + PostGIS + pgvector, Redis, SeaweedFS S3, Ollama):
+
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
 CI runs ruff and the unit tests on every push to `main` and on pull requests.

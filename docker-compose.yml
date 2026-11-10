@@ -1,0 +1,113 @@
+services:
+  postgres:
+    build: docker/postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-housing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-housing}
+      POSTGRES_DB: ${POSTGRES_DB:-housing}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8.10.3-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible object storage (raw pages). Swaps to AWS S3 / R2 via STORAGE_ENDPOINT.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.53
+    command: >
+      server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0
+      -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    configs:
+      - source: seaweedfs-s3
+        target: /etc/seaweedfs/s3.json
+    ports:
+      - "127.0.0.1:${STORAGE_PORT:-8333}:8333"
+    volumes:
+      - seaweedfs-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9333/cluster/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # One-shot: create the bucket if it doesn't exist yet.
+  seaweedfs-init:
+    image: chrislusf/seaweedfs:4.53
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    environment:
+      BUCKET: ${STORAGE_BUCKET:-housing-raw}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if echo "s3.bucket.list" | weed shell -master=seaweedfs:9333 | grep -qw "$$BUCKET"; then
+          echo "bucket $$BUCKET exists"
+        else
+          echo "s3.bucket.create -name $$BUCKET" | weed shell -master=seaweedfs:9333
+        fi
+    restart: "no"
+
+  ollama:
+    image: ollama/ollama:0.40.16
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: pull the extraction model (no-op when already in the volume).
+  ollama-pull:
+    image: ollama/ollama:0.40.16
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ["pull", "${OLLAMA_MODEL:-qwen3.5:4b}"]
+    restart: "no"
+
+configs:
+  seaweedfs-s3:
+    content: |
+      {
+        "identities": [
+          {
+            "name": "housing",
+            "credentials": [
+              {
+                "accessKey": "${STORAGE_ACCESS_KEY:-housing}",
+                "secretKey": "${STORAGE_SECRET_KEY:-housing-secret}"
+              }
+            ],
+            "actions": ["Admin", "Read", "List", "Tagging", "Write"]
+          }
+        ]
+      }
+
+volumes:
+  postgres-data:
+  redis-data:
+  seaweedfs-data:
+  ollama-models:
