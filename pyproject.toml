@@ -1,13 +1,17 @@
 [project]
 name = "housing-netherlands"
-version = "0.1.0"
+version = "0.1.1"
 description = "Personal housing dashboard for the Dutch rental market."
 readme = "README.md"
 authors = [
     { name = "Bor Cerne", email = "borc23@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.2",
+    "structlog>=26.1.0",
+]
 
 [project.scripts]
 housing-netherlands = "housing_netherlands:main"
