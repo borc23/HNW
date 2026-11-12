@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import assert_never
+from typing import TYPE_CHECKING, assert_never
 
 from housing_netherlands.adapters.blob_s3 import S3BlobStore
 from housing_netherlands.adapters.db import (
@@ -10,7 +10,6 @@ from housing_netherlands.adapters.db import (
     create_engine,
     create_session_factory,
 )
-from housing_netherlands.adapters.llm_litellm import LiteLLMClient
 from housing_netherlands.adapters.queue_arq import ArqJobQueue
 from housing_netherlands.config import Settings
 from housing_netherlands.core.models import LLMParams
@@ -21,6 +20,9 @@ from housing_netherlands.core.ports import (
     ListingRepository,
     LLMClient,
 )
+
+if TYPE_CHECKING:
+    from housing_netherlands.adapters.llm_litellm import LiteLLMClient
 
 
 @dataclass(frozen=True)
@@ -46,8 +48,14 @@ async def connect_blob_store(settings: Settings) -> S3BlobStore:
     )
 
 
-def build_llm_client(settings: Settings) -> LiteLLMClient:
-    """Stateless (no connections to close); model and params are chosen per call."""
+def build_llm_client(settings: Settings) -> "LiteLLMClient":
+    """Stateless (no connections to close); model and params are chosen per call.
+
+    LiteLLM is imported here, not at module level: its import takes ~2 s, so code that only
+    imports `wiring` (and the tests) doesn't pay for it.
+    """
+    from housing_netherlands.adapters.llm_litellm import LiteLLMClient
+
     return LiteLLMClient(ollama_api_base=settings.ollama_api_base, timeout_s=settings.llm_timeout_s)
 
 

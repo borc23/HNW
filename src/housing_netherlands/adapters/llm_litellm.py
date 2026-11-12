@@ -5,7 +5,13 @@ model and a hosted one is a config change: the Ollama base URL is only sent to o
 hosted providers always use their own endpoint.
 """
 
+import os
 from typing import Any
+
+# Must be set before importing litellm: otherwise every import fetches the model cost map over
+# the network (5 s timeout; slow or hanging offline / behind restricted egress). The packaged
+# map for the pinned version is used instead. setdefault keeps an explicit env override.
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 
 import litellm
 from litellm import ModelResponse
