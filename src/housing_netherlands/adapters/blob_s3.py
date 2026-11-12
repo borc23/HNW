@@ -2,11 +2,11 @@ import asyncio
 from contextlib import AsyncExitStack
 from typing import TYPE_CHECKING, Any, Self
 
-import aioboto3
 from aiobotocore.config import AioConfig
+from aiobotocore.session import get_session
 from botocore.exceptions import ClientError
 
-if TYPE_CHECKING:  # stubs are a dev dependency (types-aioboto3[s3])
+if TYPE_CHECKING:  # stubs are a dev dependency (types-aiobotocore[s3])
     from types_aiobotocore_s3 import S3Client
 
 # Upper bound on botocore's backoff between attempts, added to the per-call deadline.
@@ -58,11 +58,6 @@ class S3BlobStore:
     ) -> Self:
         """Open the client. Timeouts bound a hung server (botocore defaults are 60 s each);
         `max_attempts` counts the first try, so 1 means no retries."""
-        session = aioboto3.Session(
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name=region,
-        )
         config = AioConfig(
             # Path-style URLs (endpoint/bucket/key): needed by SeaweedFS, fine for AWS.
             s3={"addressing_style": "path"},
@@ -72,7 +67,14 @@ class S3BlobStore:
         )
         stack = AsyncExitStack()
         client = await stack.enter_async_context(
-            session.client("s3", endpoint_url=endpoint_url, config=config)
+            get_session().create_client(
+                "s3",
+                region_name=region,
+                endpoint_url=endpoint_url,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                config=config,
+            )
         )
         client.meta.events.register("before-send.s3", _drop_expect_continue)
         call_timeout_s = max_attempts * (connect_timeout_s + read_timeout_s) + _BACKOFF_MARGIN_S

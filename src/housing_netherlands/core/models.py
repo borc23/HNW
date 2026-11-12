@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,8 +48,10 @@ class FetchedListing(BaseModel):
 class ListingSummary(BaseModel):
     """LLM output for a listing (prompt `summary`); validated before it is stored."""
 
+    model_config = ConfigDict(extra="forbid")  # schema gets additionalProperties: false
+
     summary_en: str = Field(min_length=1)
-    key_facts: list[str] = Field(min_length=3, max_length=3)
+    key_facts: list[Annotated[str, Field(min_length=1)]] = Field(min_length=3, max_length=3)
 
 
 class LLMMessage(BaseModel):

@@ -44,6 +44,7 @@ class FakeLLMClient:
     def __init__(self, *responses: str) -> None:
         self.responses = list(responses)
         self.calls: list[list[LLMMessage]] = []
+        self.schemas: list[dict[str, Any] | None] = []
 
     async def complete(
         self,
@@ -52,7 +53,8 @@ class FakeLLMClient:
         model: str,
         json_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
-        self.calls.append(messages)
+        self.calls.append(list(messages))
+        self.schemas.append(json_schema)
         return LLMResponse(text=self.responses.pop(0), model=model)
 
 

@@ -8,7 +8,7 @@ import pytest
 PACKAGE_ROOT = Path(__file__).parents[1] / "src" / "housing_netherlands"
 
 INFRA = {
-    "aioboto3",
+    "aiobotocore",
     "arq",
     "asyncpg",
     "boto3",

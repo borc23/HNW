@@ -1,0 +1,81 @@
+"""LiteLLMClient request mapping, with litellm.acompletion patched (no model needed)."""
+
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+
+from housing_netherlands.adapters import llm_litellm
+from housing_netherlands.adapters.llm_litellm import LiteLLMClient
+from housing_netherlands.config import Settings
+from housing_netherlands.core import ports
+from housing_netherlands.core.models import ListingSummary, LLMMessage
+from housing_netherlands.wiring import build_llm_client
+
+
+@pytest.fixture
+def captured(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    calls: dict[str, Any] = {}
+
+    async def fake_acompletion(**kwargs: Any) -> Any:
+        calls.update(kwargs)
+        message = SimpleNamespace(content=calls.pop("_reply", '{"ok": true}'))
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    monkeypatch.setattr(llm_litellm.litellm, "acompletion", fake_acompletion)
+    return calls
+
+
+MESSAGES = [LLMMessage(role="system", content="s"), LLMMessage(role="user", content="u")]
+
+
+def test_implements_port() -> None:
+    assert isinstance(LiteLLMClient(api_base=None, timeout_s=1), ports.LLMClient)
+
+
+async def test_maps_request_and_response(captured: dict[str, Any]) -> None:
+    client = LiteLLMClient(api_base="http://ollama:11434", timeout_s=42, reasoning_effort="none")
+    schema = ListingSummary.model_json_schema()
+    response = await client.complete(MESSAGES, model="ollama_chat/qwen3.5:4b", json_schema=schema)
+
+    assert response.text == '{"ok": true}'
+    assert response.model == "ollama_chat/qwen3.5:4b"
+    assert captured["model"] == "ollama_chat/qwen3.5:4b"
+    assert captured["messages"] == [
+        {"role": "system", "content": "s"},
+        {"role": "user", "content": "u"},
+    ]
+    assert (captured["api_base"], captured["timeout"]) == ("http://ollama:11434", 42)
+    assert captured["reasoning_effort"] == "none"
+    assert captured["drop_params"] is True
+    fmt = captured["response_format"]
+    assert fmt["type"] == "json_schema"
+    assert fmt["json_schema"] == {"name": "ListingSummary", "schema": schema}
+
+
+async def test_plain_text_call_sends_no_response_format(captured: dict[str, Any]) -> None:
+    await LiteLLMClient(api_base=None, timeout_s=1).complete(MESSAGES, model="m")
+    assert "response_format" not in captured
+    assert "reasoning_effort" not in captured
+
+
+async def test_none_content_becomes_empty_string(
+    captured: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def none_content(**kwargs: Any) -> Any:
+        message = SimpleNamespace(content=None)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    monkeypatch.setattr(llm_litellm.litellm, "acompletion", none_content)
+    response = await LiteLLMClient(api_base=None, timeout_s=1).complete(MESSAGES, model="m")
+    assert response.text == ""
+
+
+def test_wiring_passes_llm_settings() -> None:
+    settings = Settings(llm_api_base="http://x:1", llm_timeout_s=7, llm_reasoning_effort="low")  # type: ignore[call-arg]
+    client = build_llm_client(settings)
+    assert (client._api_base, client._timeout_s, client._reasoning_effort) == (
+        "http://x:1",
+        7,
+        "low",
+    )

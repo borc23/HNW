@@ -1,6 +1,6 @@
 [project]
 name = "housing-netherlands"
-version = "0.1.4"
+version = "0.1.5"
 description = "Personal housing dashboard for the Dutch rental market."
 readme = "README.md"
 authors = [
@@ -8,11 +8,12 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "aioboto3>=15.5.0",
+    "aiobotocore>=3.10.0",
     "alembic>=1.20.1",
     "arq>=0.28.0",
     "asyncpg>=0.32.0",
     "geoalchemy2>=0.21.0",
+    "litellm==1.106.6",
     "pydantic>=2.14.3",
     "pydantic-settings>=2.16.2",
     "sqlalchemy[asyncio]>=2.1.8",
@@ -34,7 +35,7 @@ dev = [
     "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.4",
-    "types-aioboto3[s3]>=15.5.0",
+    "types-aiobotocore[s3]>=3.10.0",
 ]
 
 [tool.ruff]
@@ -63,6 +64,10 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    # Raised inside litellm's own TypedDicts when pydantic builds their schema; not our code.
+    "ignore:Item .* is using the `ReadOnly` qualifier:UserWarning",
+]
 markers = [
     "integration: needs the Docker Compose stack (postgres, redis, minio); deselect with -m 'not integration'",
 ]

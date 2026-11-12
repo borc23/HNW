@@ -10,9 +10,16 @@ from housing_netherlands.adapters.db import (
     create_engine,
     create_session_factory,
 )
+from housing_netherlands.adapters.llm_litellm import LiteLLMClient
 from housing_netherlands.adapters.queue_arq import ArqJobQueue
 from housing_netherlands.config import Settings
-from housing_netherlands.core.ports import BlobStore, JobLog, JobQueue, ListingRepository
+from housing_netherlands.core.ports import (
+    BlobStore,
+    JobLog,
+    JobQueue,
+    ListingRepository,
+    LLMClient,
+)
 
 
 @dataclass(frozen=True)
@@ -21,6 +28,7 @@ class Adapters:
     job_log: JobLog
     blobs: BlobStore
     queue: JobQueue
+    llm: LLMClient
 
 
 async def connect_blob_store(settings: Settings) -> S3BlobStore:
@@ -34,6 +42,15 @@ async def connect_blob_store(settings: Settings) -> S3BlobStore:
         connect_timeout_s=settings.storage_connect_timeout_s,
         read_timeout_s=settings.storage_read_timeout_s,
         max_attempts=settings.storage_max_attempts,
+    )
+
+
+def build_llm_client(settings: Settings) -> LiteLLMClient:
+    """Stateless (no connections to close); the model is chosen per call."""
+    return LiteLLMClient(
+        api_base=settings.llm_api_base,
+        timeout_s=settings.llm_timeout_s,
+        reasoning_effort=settings.llm_reasoning_effort,
     )
 
 
@@ -66,4 +83,5 @@ async def build_adapters(settings: Settings) -> AsyncIterator[Adapters]:
             job_log=SqlJobLog(sessions),
             blobs=blobs,
             queue=queue,
+            llm=build_llm_client(settings),
         )
