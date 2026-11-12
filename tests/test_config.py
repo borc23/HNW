@@ -5,8 +5,10 @@ from housing_netherlands.config import Settings
 
 @pytest.fixture(autouse=True)
 def _isolate_env(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    # Don't let a developer's real .env leak into tests.
+    # Don't let a developer's real .env (or direnv-exported vars) leak into tests.
     monkeypatch.chdir(tmp_path)
+    for name in Settings.model_fields:
+        monkeypatch.delenv(name.upper(), raising=False)
 
 
 def test_defaults_target_local_stack() -> None:
@@ -41,3 +43,9 @@ def test_secrets_are_not_printed(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reads_dotenv_file(tmp_path) -> None:
     (tmp_path / ".env").write_text("REDIS_URL=redis://cache:6379/1\n")
     assert Settings().redis_url == "redis://cache:6379/1"
+
+
+@pytest.mark.parametrize("name", ["STORAGE_ENDPOINT", "LLM_API_BASE"])
+def test_empty_optional_url_means_unset(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    monkeypatch.setenv(name, "")
+    assert getattr(Settings(), name.lower()) is None

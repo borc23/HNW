@@ -1,6 +1,7 @@
 import pytest
 
 from housing_netherlands.core import ports
+from housing_netherlands.core.errors import DuplicateJobError
 from housing_netherlands.core.models import FetchedListing, JobStatus, ListingSummary
 from tests.fakes import (
     FakeBlobStore,
@@ -57,3 +58,11 @@ async def test_fake_source_and_job_log() -> None:
     await log.record("j1", job_type="import_listing", status=JobStatus.RUNNING)
     await log.record("j1", job_type="import_listing", status=JobStatus.FAILED, error="boom")
     assert log.records["j1"][-1] == ("import_listing", JobStatus.FAILED, "boom")
+
+
+async def test_fake_queue_rejects_reused_job_id() -> None:
+    queue = FakeJobQueue()
+    await queue.enqueue("import_listing", {"url": "a"}, job_id="j1")
+    with pytest.raises(DuplicateJobError):
+        await queue.enqueue("import_listing", {"url": "b"}, job_id="j1")
+    assert len(queue.jobs) == 1

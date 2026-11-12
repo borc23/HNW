@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from housing_netherlands.core.errors import DuplicateJobError
 from housing_netherlands.core.models import (
     FetchedListing,
     JobStatus,
@@ -15,10 +16,14 @@ from housing_netherlands.core.models import (
 
 
 class FakeJobQueue:
+    """Mirrors the port contract: a reused job id raises `DuplicateJobError`."""
+
     def __init__(self) -> None:
         self.jobs: list[tuple[str, dict[str, Any], str]] = []
 
     async def enqueue(self, job_name: str, payload: dict[str, Any], *, job_id: str) -> None:
+        if any(existing == job_id for _, _, existing in self.jobs):
+            raise DuplicateJobError(job_id)
         self.jobs.append((job_name, payload, job_id))
 
 

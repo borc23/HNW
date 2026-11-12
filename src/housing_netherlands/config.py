@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     storage_region: str = "us-east-1"
     storage_access_key: SecretStr = SecretStr("housing")
     storage_secret_key: SecretStr = SecretStr("housing-secret")
+    # Worst case per call ~= attempts x (connect + read) + backoff: 2 x (3 + 10) s ~= 30 s.
+    storage_connect_timeout_s: float = Field(default=3.0, gt=0)
+    storage_read_timeout_s: float = Field(default=10.0, gt=0)
+    storage_max_attempts: int = Field(default=2, ge=1)  # total attempts, incl. the first
 
     llm_model_extract: str = "ollama_chat/qwen3.5:4b"
     llm_api_base: str | None = "http://localhost:11434"
@@ -40,6 +44,12 @@ class Settings(BaseSettings):
 
     # listing sources allowed to run; comma-separated in the env
     sources_enabled: Annotated[list[str], NoDecode] = ["huurwoningen"]
+
+    @field_validator("storage_endpoint", "llm_api_base", mode="before")
+    @classmethod
+    def _empty_means_unset(cls, value: object) -> object:
+        # `STORAGE_ENDPOINT=` in .env means "no custom endpoint" (e.g. real AWS S3).
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("sources_enabled", mode="before")
     @classmethod
