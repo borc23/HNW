@@ -9,8 +9,8 @@ from housing_netherlands.adapters import llm_litellm
 from housing_netherlands.adapters.llm_litellm import LiteLLMClient
 from housing_netherlands.config import Settings
 from housing_netherlands.core import ports
-from housing_netherlands.core.models import ListingSummary, LLMMessage
-from housing_netherlands.wiring import build_llm_client
+from housing_netherlands.core.models import ListingSummary, LLMMessage, LLMParams
+from housing_netherlands.wiring import build_llm_client, extract_llm_params
 
 
 @pytest.fixture
@@ -34,9 +34,10 @@ def test_implements_port() -> None:
 
 
 async def test_maps_request_and_response(captured: dict[str, Any]) -> None:
-    client = LiteLLMClient(api_base="http://ollama:11434", timeout_s=42, reasoning_effort="none")
+    client = LiteLLMClient(api_base="http://ollama:11434", timeout_s=42)
     schema = ListingSummary.model_json_schema()
-    response = await client.complete(MESSAGES, model="ollama_chat/qwen3.5:4b", json_schema=schema)
+    params = LLMParams(model="ollama_chat/qwen3.5:4b", reasoning_effort="none")
+    response = await client.complete(MESSAGES, params=params, json_schema=schema)
 
     assert response.text == '{"ok": true}'
     assert response.model == "ollama_chat/qwen3.5:4b"
@@ -54,7 +55,7 @@ async def test_maps_request_and_response(captured: dict[str, Any]) -> None:
 
 
 async def test_plain_text_call_sends_no_response_format(captured: dict[str, Any]) -> None:
-    await LiteLLMClient(api_base=None, timeout_s=1).complete(MESSAGES, model="m")
+    await LiteLLMClient(api_base=None, timeout_s=1).complete(MESSAGES, params=LLMParams(model="m"))
     assert "response_format" not in captured
     assert "reasoning_effort" not in captured
 
@@ -67,15 +68,20 @@ async def test_none_content_becomes_empty_string(
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
     monkeypatch.setattr(llm_litellm.litellm, "acompletion", none_content)
-    response = await LiteLLMClient(api_base=None, timeout_s=1).complete(MESSAGES, model="m")
+    client = LiteLLMClient(api_base=None, timeout_s=1)
+    response = await client.complete(MESSAGES, params=LLMParams(model="m"))
     assert response.text == ""
 
 
 def test_wiring_passes_llm_settings() -> None:
-    settings = Settings(llm_api_base="http://x:1", llm_timeout_s=7, llm_reasoning_effort="low")  # type: ignore[call-arg]
+    settings = Settings(
+        llm_model_extract="anthropic/claude-haiku-5-5",
+        llm_api_base="http://x:1",
+        llm_timeout_s=7,
+        llm_reasoning_effort="low",
+    )  # type: ignore[call-arg]
     client = build_llm_client(settings)
-    assert (client._api_base, client._timeout_s, client._reasoning_effort) == (
-        "http://x:1",
-        7,
-        "low",
+    assert (client._api_base, client._timeout_s) == ("http://x:1", 7)
+    assert extract_llm_params(settings) == LLMParams(
+        model="anthropic/claude-haiku-5-5", reasoning_effort="low"
     )

@@ -13,6 +13,7 @@ from housing_netherlands.adapters.db import (
 from housing_netherlands.adapters.llm_litellm import LiteLLMClient
 from housing_netherlands.adapters.queue_arq import ArqJobQueue
 from housing_netherlands.config import Settings
+from housing_netherlands.core.models import LLMParams
 from housing_netherlands.core.ports import (
     BlobStore,
     JobLog,
@@ -46,11 +47,14 @@ async def connect_blob_store(settings: Settings) -> S3BlobStore:
 
 
 def build_llm_client(settings: Settings) -> LiteLLMClient:
-    """Stateless (no connections to close); the model is chosen per call."""
-    return LiteLLMClient(
-        api_base=settings.llm_api_base,
-        timeout_s=settings.llm_timeout_s,
-        reasoning_effort=settings.llm_reasoning_effort,
+    """Stateless (no connections to close); model and params are chosen per call."""
+    return LiteLLMClient(api_base=settings.llm_api_base, timeout_s=settings.llm_timeout_s)
+
+
+def extract_llm_params(settings: Settings) -> LLMParams:
+    """Generation params for extraction/summary jobs (part of the LLM cache key)."""
+    return LLMParams(
+        model=settings.llm_model_extract, reasoning_effort=settings.llm_reasoning_effort
     )
 
 

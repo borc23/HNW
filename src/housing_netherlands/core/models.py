@@ -59,6 +59,18 @@ class LLMMessage(BaseModel):
     content: str
 
 
+class LLMParams(BaseModel):
+    """Generation settings that change the model's output, so they belong in cache keys.
+
+    Transport details (API base URL, timeouts) are not here: they don't change the output.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str
+    reasoning_effort: str | None = None
+
+
 class LLMResponse(BaseModel):
     text: str
     model: str

@@ -11,6 +11,7 @@ from housing_netherlands.core.models import (
     ListingSummary,
     ListingView,
     LLMMessage,
+    LLMParams,
     LLMResponse,
 )
 
@@ -45,17 +46,19 @@ class FakeLLMClient:
         self.responses = list(responses)
         self.calls: list[list[LLMMessage]] = []
         self.schemas: list[dict[str, Any] | None] = []
+        self.params: list[LLMParams] = []
 
     async def complete(
         self,
         messages: list[LLMMessage],
         *,
-        model: str,
+        params: LLMParams,
         json_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
         self.calls.append(list(messages))
         self.schemas.append(json_schema)
-        return LLMResponse(text=self.responses.pop(0), model=model)
+        self.params.append(params)
+        return LLMResponse(text=self.responses.pop(0), model=params.model)
 
 
 class FakeSourceAdapter:

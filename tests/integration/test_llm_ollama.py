@@ -9,7 +9,7 @@ import pytest
 
 from housing_netherlands.config import Settings
 from housing_netherlands.core.summarize import build_summary_request, summarize
-from housing_netherlands.wiring import build_llm_client
+from housing_netherlands.wiring import build_llm_client, extract_llm_params
 from tests.service_probe import tcp_target
 from tests.test_core_models import make_listing
 
@@ -33,8 +33,7 @@ async def test_real_model_returns_valid_summary(settings: Settings) -> None:
     )
     result = await summarize(
         build_llm_client(settings),
-        build_summary_request(listing),
-        model=settings.llm_model_extract,
+        build_summary_request(listing, extract_llm_params(settings)),
     )
     assert result.summary.summary_en
     assert len(result.summary.key_facts) == 3
