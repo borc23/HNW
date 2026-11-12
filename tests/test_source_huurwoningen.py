@@ -1,5 +1,6 @@
 """HuurwoningenSource with a fake HTTP session: URL handling, parsing and error mapping."""
 
+from contextlib import AsyncExitStack
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -7,9 +8,15 @@ from typing import Any
 import pytest
 from curl_cffi.requests.exceptions import Timeout
 
-from housing_netherlands.adapters.source_huurwoningen import HuurwoningenSource, canonical_url
+from housing_netherlands.adapters.source_huurwoningen import (
+    HuurwoningenSource,
+    canonical_url,
+    check_impersonate,
+)
+from housing_netherlands.config import Settings
 from housing_netherlands.core import ports
 from housing_netherlands.core.errors import SourceFetchError, SourceParseError
+from housing_netherlands.wiring import build_sources
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "huurwoningen" / "detail.html").read_bytes()
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
@@ -160,3 +167,29 @@ async def test_close_closes_the_session() -> None:
     source, session = make_source()
     await source.close()
     assert session.closed
+
+
+# --- impersonate profile: checked at startup, not on the first fetch ---------------------
+
+
+@pytest.mark.parametrize("profile", ["chrome", "safari", "firefox", "edge", "chrome124"])
+def test_valid_impersonate_profiles_are_accepted(profile: str) -> None:
+    assert check_impersonate(profile) == profile
+    HuurwoningenSource(timeout_s=1, impersonate=profile, session=FakeSession())
+
+
+@pytest.mark.parametrize("profile", ["chrom", "Chrome", "", "chrome9999", "netscape"])
+def test_unknown_impersonate_profile_fails_at_construction(profile: str) -> None:
+    with pytest.raises(ValueError, match="HUURWONINGEN_IMPERSONATE"):
+        HuurwoningenSource(timeout_s=1, impersonate=profile, session=FakeSession())
+
+
+async def test_typo_in_settings_stops_startup() -> None:
+    settings = Settings(huurwoningen_impersonate="chrom")  # type: ignore[call-arg]
+    async with AsyncExitStack() as stack:
+        with pytest.raises(ValueError, match="'chrom' is not a curl_cffi browser profile"):
+            build_sources(settings, stack)
+
+
+def test_default_profile_is_valid() -> None:
+    check_impersonate(Settings().huurwoningen_impersonate)

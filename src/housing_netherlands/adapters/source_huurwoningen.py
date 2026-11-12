@@ -7,8 +7,9 @@ clients with 403. Parsing is pyhuurwoningen's, so markup changes are fixed in th
 from typing import Any
 from urllib.parse import urlsplit
 
-from curl_cffi.requests import AsyncSession
+from curl_cffi.requests import AsyncSession, BrowserType
 from curl_cffi.requests.exceptions import RequestException
+from curl_cffi.requests.impersonate import resolve_latest_browser_type
 from pydantic import ValidationError
 from pyhuurwoningen.models import ListingDetails
 from pyhuurwoningen.parsing import BASE_URL, DETAIL_PATH, parse_detail_page
@@ -59,6 +60,23 @@ def to_listing(details: ListingDetails, url: str) -> Listing:
     )
 
 
+_BROWSER_PROFILES = frozenset(b.value for b in BrowserType)
+
+
+def check_impersonate(profile: str) -> str:
+    """Validate a curl_cffi browser profile the way curl_cffi does (alias -> versioned target).
+
+    curl_cffi only rejects an unknown profile on the first request, as a RequestException that
+    would look like a retryable fetch failure; checking here makes a config typo fail at startup.
+    """
+    if resolve_latest_browser_type(profile) not in _BROWSER_PROFILES:
+        raise ValueError(
+            f"HUURWONINGEN_IMPERSONATE={profile!r} is not a curl_cffi browser profile; "
+            "use e.g. 'chrome', 'safari', 'firefox', 'edge' or a versioned one like 'chrome124'"
+        )
+    return profile
+
+
 class HuurwoningenSource:
     """Holds one HTTP session (connection reuse); release it with `await source.close()`.
 
@@ -76,9 +94,10 @@ class HuurwoningenSource:
         session: Any = None,  # an AsyncSession-like object; tests pass a fake
     ) -> None:
         self._timeout_s = timeout_s
+        check_impersonate(impersonate)
         if session is None:
             session = AsyncSession(
-                impersonate=impersonate,  # type: ignore[arg-type]  # str, checked by curl_cffi
+                impersonate=impersonate,  # type: ignore[arg-type]  # str, checked above
                 headers={"Accept-Language": ACCEPT_LANGUAGE},
             )
         self._session = session
