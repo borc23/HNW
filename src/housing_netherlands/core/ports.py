@@ -9,6 +9,7 @@ from housing_netherlands.core.models import (
     ListingSummary,
     ListingView,
     LLMMessage,
+    LLMParams,
     LLMResponse,
 )
 
@@ -38,7 +39,7 @@ class LLMClient(Protocol):
         self,
         messages: list[LLMMessage],
         *,
-        model: str,
+        params: LLMParams,
         json_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
         """Return the raw completion text. Callers validate structured output themselves."""

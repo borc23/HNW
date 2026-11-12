@@ -39,13 +39,15 @@ class Settings(BaseSettings):
     storage_max_attempts: int = Field(default=2, ge=1)  # total attempts, incl. the first
 
     llm_model_extract: str = "ollama_chat/qwen3.5:4b"
-    llm_api_base: str | None = "http://localhost:11434"
+    # Only used for ollama/* models; hosted providers always use their own endpoint.
+    ollama_api_base: str | None = "http://localhost:11434"
     llm_timeout_s: float = Field(default=120.0, gt=0)
+    llm_reasoning_effort: str | None = "none"
 
     # listing sources allowed to run; comma-separated in the env
     sources_enabled: Annotated[list[str], NoDecode] = ["huurwoningen"]
 
-    @field_validator("storage_endpoint", "llm_api_base", mode="before")
+    @field_validator("storage_endpoint", "ollama_api_base", "llm_reasoning_effort", mode="before")
     @classmethod
     def _empty_means_unset(cls, value: object) -> object:
         # `STORAGE_ENDPOINT=` in .env means "no custom endpoint" (e.g. real AWS S3).

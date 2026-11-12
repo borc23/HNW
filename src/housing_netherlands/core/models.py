@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,13 +48,27 @@ class FetchedListing(BaseModel):
 class ListingSummary(BaseModel):
     """LLM output for a listing (prompt `summary`); validated before it is stored."""
 
+    model_config = ConfigDict(extra="forbid")  # schema gets additionalProperties: false
+
     summary_en: str = Field(min_length=1)
-    key_facts: list[str] = Field(min_length=3, max_length=3)
+    key_facts: list[Annotated[str, Field(min_length=1)]] = Field(min_length=3, max_length=3)
 
 
 class LLMMessage(BaseModel):
     role: str
     content: str
+
+
+class LLMParams(BaseModel):
+    """Generation settings that change the model's output, so they belong in cache keys.
+
+    Transport details (API base URL, timeouts) are not here: they don't change the output.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str
+    reasoning_effort: str | None = None
 
 
 class LLMResponse(BaseModel):

@@ -45,7 +45,7 @@ def test_reads_dotenv_file(tmp_path) -> None:
     assert Settings().redis_url == "redis://cache:6379/1"
 
 
-@pytest.mark.parametrize("name", ["STORAGE_ENDPOINT", "LLM_API_BASE"])
+@pytest.mark.parametrize("name", ["STORAGE_ENDPOINT", "OLLAMA_API_BASE"])
 def test_empty_optional_url_means_unset(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
     monkeypatch.setenv(name, "")
     assert getattr(Settings(), name.lower()) is None

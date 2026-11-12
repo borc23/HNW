@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import assert_never
+from typing import TYPE_CHECKING, assert_never
 
 from housing_netherlands.adapters.blob_s3 import S3BlobStore
 from housing_netherlands.adapters.db import (
@@ -12,7 +12,17 @@ from housing_netherlands.adapters.db import (
 )
 from housing_netherlands.adapters.queue_arq import ArqJobQueue
 from housing_netherlands.config import Settings
-from housing_netherlands.core.ports import BlobStore, JobLog, JobQueue, ListingRepository
+from housing_netherlands.core.models import LLMParams
+from housing_netherlands.core.ports import (
+    BlobStore,
+    JobLog,
+    JobQueue,
+    ListingRepository,
+    LLMClient,
+)
+
+if TYPE_CHECKING:
+    from housing_netherlands.adapters.llm_litellm import LiteLLMClient
 
 
 @dataclass(frozen=True)
@@ -21,6 +31,7 @@ class Adapters:
     job_log: JobLog
     blobs: BlobStore
     queue: JobQueue
+    llm: LLMClient
 
 
 async def connect_blob_store(settings: Settings) -> S3BlobStore:
@@ -34,6 +45,24 @@ async def connect_blob_store(settings: Settings) -> S3BlobStore:
         connect_timeout_s=settings.storage_connect_timeout_s,
         read_timeout_s=settings.storage_read_timeout_s,
         max_attempts=settings.storage_max_attempts,
+    )
+
+
+def build_llm_client(settings: Settings) -> "LiteLLMClient":
+    """Stateless (no connections to close); model and params are chosen per call.
+
+    LiteLLM is imported here, not at module level: its import takes ~2 s, so code that only
+    imports `wiring` (and the tests) doesn't pay for it.
+    """
+    from housing_netherlands.adapters.llm_litellm import LiteLLMClient
+
+    return LiteLLMClient(ollama_api_base=settings.ollama_api_base, timeout_s=settings.llm_timeout_s)
+
+
+def extract_llm_params(settings: Settings) -> LLMParams:
+    """Generation params for extraction/summary jobs (part of the LLM cache key)."""
+    return LLMParams(
+        model=settings.llm_model_extract, reasoning_effort=settings.llm_reasoning_effort
     )
 
 
@@ -66,4 +95,5 @@ async def build_adapters(settings: Settings) -> AsyncIterator[Adapters]:
             job_log=SqlJobLog(sessions),
             blobs=blobs,
             queue=queue,
+            llm=build_llm_client(settings),
         )
