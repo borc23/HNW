@@ -30,11 +30,11 @@ MESSAGES = [LLMMessage(role="system", content="s"), LLMMessage(role="user", cont
 
 
 def test_implements_port() -> None:
-    assert isinstance(LiteLLMClient(api_base=None, timeout_s=1), ports.LLMClient)
+    assert isinstance(LiteLLMClient(ollama_api_base=None, timeout_s=1), ports.LLMClient)
 
 
 async def test_maps_request_and_response(captured: dict[str, Any]) -> None:
-    client = LiteLLMClient(api_base="http://ollama:11434", timeout_s=42)
+    client = LiteLLMClient(ollama_api_base="http://ollama:11434", timeout_s=42)
     schema = ListingSummary.model_json_schema()
     params = LLMParams(model="ollama_chat/qwen3.5:4b", reasoning_effort="none")
     response = await client.complete(MESSAGES, params=params, json_schema=schema)
@@ -55,7 +55,8 @@ async def test_maps_request_and_response(captured: dict[str, Any]) -> None:
 
 
 async def test_plain_text_call_sends_no_response_format(captured: dict[str, Any]) -> None:
-    await LiteLLMClient(api_base=None, timeout_s=1).complete(MESSAGES, params=LLMParams(model="m"))
+    client = LiteLLMClient(ollama_api_base=None, timeout_s=1)
+    await client.complete(MESSAGES, params=LLMParams(model="m"))
     assert "response_format" not in captured
     assert "reasoning_effort" not in captured
 
@@ -68,20 +69,36 @@ async def test_none_content_becomes_empty_string(
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
     monkeypatch.setattr(llm_litellm.litellm, "acompletion", none_content)
-    client = LiteLLMClient(api_base=None, timeout_s=1)
+    client = LiteLLMClient(ollama_api_base=None, timeout_s=1)
     response = await client.complete(MESSAGES, params=LLMParams(model="m"))
     assert response.text == ""
+
+
+@pytest.mark.parametrize(
+    "model", ["anthropic/claude-haiku-5-5", "gpt-5-mini", "bedrock/anthropic.claude-haiku"]
+)
+async def test_hosted_models_never_get_the_ollama_url(captured: dict[str, Any], model: str) -> None:
+    client = LiteLLMClient(ollama_api_base="http://localhost:11434", timeout_s=1)
+    await client.complete(MESSAGES, params=LLMParams(model=model))
+    assert "api_base" not in captured  # provider's own endpoint
+
+
+@pytest.mark.parametrize("model", ["ollama_chat/qwen3.5:4b", "ollama/qwen3.5:4b"])
+async def test_ollama_models_get_the_ollama_url(captured: dict[str, Any], model: str) -> None:
+    client = LiteLLMClient(ollama_api_base="http://ollama:11434", timeout_s=1)
+    await client.complete(MESSAGES, params=LLMParams(model=model))
+    assert captured["api_base"] == "http://ollama:11434"
 
 
 def test_wiring_passes_llm_settings() -> None:
     settings = Settings(
         llm_model_extract="anthropic/claude-haiku-5-5",
-        llm_api_base="http://x:1",
+        ollama_api_base="http://x:1",
         llm_timeout_s=7,
         llm_reasoning_effort="low",
     )  # type: ignore[call-arg]
     client = build_llm_client(settings)
-    assert (client._api_base, client._timeout_s) == ("http://x:1", 7)
+    assert (client._ollama_api_base, client._timeout_s) == ("http://x:1", 7)
     assert extract_llm_params(settings) == LLMParams(
         model="anthropic/claude-haiku-5-5", reasoning_effort="low"
     )

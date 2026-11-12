@@ -18,9 +18,9 @@ from tests.test_core_models import make_listing
 def settings() -> Settings:
     settings = Settings()
     try:
-        socket.create_connection(tcp_target(settings.llm_api_base or ""), timeout=1).close()
+        socket.create_connection(tcp_target(settings.ollama_api_base or ""), timeout=1).close()
     except (OSError, ValueError) as exc:
-        pytest.skip(f"Ollama not reachable at {settings.llm_api_base!r} ({exc})")
+        pytest.skip(f"Ollama not reachable at {settings.ollama_api_base!r} ({exc})")
     return settings
 
 

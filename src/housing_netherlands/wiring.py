@@ -48,7 +48,7 @@ async def connect_blob_store(settings: Settings) -> S3BlobStore:
 
 def build_llm_client(settings: Settings) -> LiteLLMClient:
     """Stateless (no connections to close); model and params are chosen per call."""
-    return LiteLLMClient(api_base=settings.llm_api_base, timeout_s=settings.llm_timeout_s)
+    return LiteLLMClient(ollama_api_base=settings.ollama_api_base, timeout_s=settings.llm_timeout_s)
 
 
 def extract_llm_params(settings: Settings) -> LLMParams:
