@@ -1,21 +1,22 @@
-"""Integration fixtures: a dedicated `<db>_test` database on the Compose Postgres, migrated once.
-
-Locally the tests skip when Postgres isn't running; on CI (`CI` env var set) they fail instead.
-"""
-
 import asyncio
 import os
+import socket
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import NoReturn
 
 import pytest
 from alembic.config import Config
+from redis.asyncio import Redis
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
 from housing_netherlands.adapters.db import create_engine, create_session_factory
 from housing_netherlands.config import Settings
+from housing_netherlands.wiring import connect_blob_store
+from tests.isolation import to_test_settings
+from tests.service_probe import tcp_target
 
 ROOT = Path(__file__).parents[2]
 TABLES = "jobs_log, listing_enrichments, listings, properties"
@@ -42,17 +43,66 @@ async def _ensure_database(admin_url: str, name: str) -> None:
 
 
 @pytest.fixture(scope="session")
-def database_url() -> str:
-    base = make_url(Settings().database_url)
-    test_url = base.set(database=f"{base.database}_test")
+def database_url(test_settings: Settings) -> str:
+    """URL of the test database, created (via the dev database's server) if missing."""
+    test_url = make_url(test_settings.database_url)
+    admin_url = Settings().database_url  # same server; only used to CREATE DATABASE
     try:
-        asyncio.run(_ensure_database(base.render_as_string(hide_password=False), test_url.database))
+        asyncio.run(_ensure_database(admin_url, str(test_url.database)))
     except OSError as exc:
-        reason = f"Postgres not reachable ({exc}); run `docker compose up -d postgres`"
-        if os.getenv("CI"):
-            pytest.fail(reason, pytrace=False)
-        pytest.skip(reason)
-    return test_url.render_as_string(hide_password=False)
+        unavailable("postgres", exc)
+    return test_settings.database_url
+
+
+def unavailable(service: str, exc: Exception) -> NoReturn:
+    """Skip locally, fail on CI, when a Compose service isn't running."""
+    reason = f"{service} not reachable ({exc}); run `docker compose up -d {service}`"
+    if os.getenv("CI"):
+        pytest.fail(reason, pytrace=False)
+    pytest.skip(reason)
+
+
+def require_tcp(service: str, url: str) -> None:
+    """Skip/fail (see `unavailable`) unless `url`'s host accepts TCP; port defaults by scheme."""
+    try:
+        socket.create_connection(tcp_target(url), timeout=1).close()
+    except OSError as exc:
+        unavailable(service, exc)
+
+
+@pytest.fixture(scope="session")
+def test_settings() -> Settings:
+    """App settings pointed at test-only resources; the only source of them (see isolation.py)."""
+    return to_test_settings(Settings())
+
+
+@pytest.fixture
+async def redis_test_url(test_settings: Settings) -> AsyncIterator[str]:
+    require_tcp("redis", test_settings.redis_url)
+    client = Redis.from_url(test_settings.redis_url)
+    await client.flushdb()
+    yield test_settings.redis_url
+    await client.flushdb()
+    await client.aclose()
+
+
+@pytest.fixture(scope="session")
+def s3_settings(test_settings: Settings) -> Settings:
+    """Test settings, with the test bucket on the local S3 created if missing."""
+    if test_settings.storage_endpoint is None:
+        # No endpoint means real AWS S3; these tests are for the local Compose S3 only.
+        pytest.skip("STORAGE_ENDPOINT not set (AWS S3); S3 integration tests need local SeaweedFS")
+    require_tcp("seaweedfs", test_settings.storage_endpoint)
+    asyncio.run(_ensure_bucket(test_settings))
+    return test_settings
+
+
+async def _ensure_bucket(settings: Settings) -> None:
+    store = await connect_blob_store(settings)
+    try:
+        await store.ensure_bucket()
+    finally:
+        await store.close()
 
 
 @pytest.fixture(scope="session")

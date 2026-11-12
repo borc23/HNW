@@ -16,7 +16,12 @@ from housing_netherlands.core.models import (
 @runtime_checkable
 class JobQueue(Protocol):
     async def enqueue(self, job_name: str, payload: dict[str, Any], *, job_id: str) -> None:
-        """Queue `job_name` with `payload`. `job_id` is the correlation id used in logs."""
+        """Queue `job_name` with `payload`.
+
+        `job_id` must be unique per job: it is the correlation id in logs and `jobs_log`, and the
+        deduplication key. Raises `DuplicateJobError` if a job with that id is still known to the
+        queue (queued, running, or its result retained); the job is then NOT queued again.
+        """
         ...
 
 
