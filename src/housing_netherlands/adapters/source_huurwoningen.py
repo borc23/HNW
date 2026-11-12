@@ -1,0 +1,122 @@
+"""`SourceAdapter` for huurwoningen.nl. Scraped source: personal use only (SOURCES_ENABLED).
+
+Fetching uses curl_cffi with a browser's network fingerprint, because the site answers plain HTTP
+clients with 403. Parsing is pyhuurwoningen's, so markup changes are fixed in that one library.
+"""
+
+from typing import Any
+from urllib.parse import urlsplit
+
+from curl_cffi.requests import AsyncSession
+from curl_cffi.requests.exceptions import RequestException
+from pydantic import ValidationError
+from pyhuurwoningen.models import ListingDetails
+from pyhuurwoningen.parsing import BASE_URL, DETAIL_PATH, parse_detail_page
+
+from housing_netherlands.core.errors import SourceFetchError, SourceParseError
+from housing_netherlands.core.models import FetchedListing, Listing
+
+NAME = "huurwoningen"
+HOSTS = frozenset({"www.huurwoningen.nl", "huurwoningen.nl"})
+ACCEPT_LANGUAGE = "nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7"
+
+
+def canonical_url(url: str) -> str | None:
+    """The listing's canonical (Dutch) page URL, or None if `url` is not a listing page.
+
+    Query, fragment and the English `/en/` variant all map to one URL, so the same listing
+    pasted twice is one row (listings are unique on source + url).
+    """
+    parts = urlsplit(url.strip())
+    if parts.scheme not in ("http", "https") or (parts.hostname or "").lower() not in HOSTS:
+        return None
+    match = DETAIL_PATH.match(parts.path)
+    if not match:
+        return None
+    city, listing_id = match.groups()
+    slug = parts.path.rstrip("/").rsplit("/", 1)[-1]
+    return f"{BASE_URL}/huren/{city}/{listing_id}/{slug}/"
+
+
+def to_listing(details: ListingDetails, url: str) -> Listing:
+    locality = " ".join(p for p in (details.postcode, details.city) if p)
+    return Listing(
+        source=NAME,
+        source_listing_id=details.id,
+        url=url,
+        title=details.title,
+        price_eur=details.price,
+        area_m2=details.area or None,  # 0 m² means "not shown"
+        rooms=details.rooms,
+        bedrooms=details.bedrooms,
+        # The site shows the street without a house number.
+        address_text=", ".join(p for p in (details.street, locality) if p) or None,
+        postcode=details.postcode,
+        city=details.city,
+        latitude=details.latitude,
+        longitude=details.longitude,
+        description=details.description,
+    )
+
+
+class HuurwoningenSource:
+    """Holds one HTTP session (connection reuse); release it with `await source.close()`.
+
+    No retries here: a failed fetch raises `SourceFetchError` and the job queue decides
+    whether to retry (`SourceFetchError.retryable`).
+    """
+
+    name = NAME
+
+    def __init__(
+        self,
+        *,
+        timeout_s: float,
+        impersonate: str = "chrome",
+        session: Any = None,  # an AsyncSession-like object; tests pass a fake
+    ) -> None:
+        self._timeout_s = timeout_s
+        if session is None:
+            session = AsyncSession(
+                impersonate=impersonate,  # type: ignore[arg-type]  # str, checked by curl_cffi
+                headers={"Accept-Language": ACCEPT_LANGUAGE},
+            )
+        self._session = session
+
+    async def close(self) -> None:
+        await self._session.close()
+
+    def can_handle(self, url: str) -> bool:
+        return canonical_url(url) is not None
+
+    async def fetch(self, url: str) -> FetchedListing:
+        canonical = canonical_url(url)
+        if canonical is None:
+            raise ValueError(f"not a huurwoningen.nl listing URL: {url!r}")
+
+        try:
+            response = await self._session.get(canonical, timeout=self._timeout_s)
+        except RequestException as exc:
+            raise SourceFetchError(NAME, canonical, f"{type(exc).__name__}: {exc}") from exc
+
+        status = response.status_code
+        if status >= 400:
+            blocked = status == 403 and response.headers.get("cf-mitigated")
+            reason = "blocked by a Cloudflare bot check" if blocked else f"HTTP {status}"
+            raise SourceFetchError(NAME, canonical, reason, status=status)
+
+        raw: bytes = response.content
+        details = parse_detail_page(raw, canonical)
+        if not details.title:
+            # e.g. a removed listing that redirects to search results, or changed markup
+            raise SourceParseError(NAME, canonical, "page has no listing title")
+        try:
+            listing = to_listing(details, canonical)
+        except ValidationError as exc:
+            raise SourceParseError(NAME, canonical, f"unexpected values: {exc}") from exc
+
+        return FetchedListing(
+            listing=listing,
+            raw=raw,
+            raw_content_type=response.headers.get("content-type") or "text/html",
+        )

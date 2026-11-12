@@ -11,6 +11,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+SourceName = Literal["huurwoningen"]
 
 
 class Settings(BaseSettings):
@@ -45,7 +46,12 @@ class Settings(BaseSettings):
     llm_reasoning_effort: str | None = "none"
 
     # listing sources allowed to run; comma-separated in the env
-    sources_enabled: Annotated[list[str], NoDecode] = ["huurwoningen"]
+    sources_enabled: Annotated[list[SourceName], NoDecode] = ["huurwoningen"]
+
+    # huurwoningen.nl (scraped: personal use only)
+    huurwoningen_timeout_s: float = Field(default=20.0, gt=0)
+    # curl_cffi browser profile, e.g. "chrome", "safari", "firefox"; change it if the site blocks
+    huurwoningen_impersonate: str = "chrome"
 
     @field_validator("storage_endpoint", "ollama_api_base", "llm_reasoning_effort", mode="before")
     @classmethod
@@ -57,7 +63,8 @@ class Settings(BaseSettings):
     @classmethod
     def _split_sources(cls, value: object) -> object:
         if isinstance(value, str):
-            return [s.strip().lower() for s in value.split(",") if s.strip()]
+            # dict.fromkeys: drop duplicates, keep order
+            return list(dict.fromkeys(s.strip().lower() for s in value.split(",") if s.strip()))
         return value
 
 
