@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
 concurrency:
@@ -11,6 +11,9 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  PYRIGHT_PYTHON_IGNORE_WARNINGS: "1"
 
 jobs:
   lint-and-test:
@@ -34,8 +37,42 @@ jobs:
       - name: Ruff format
         run: uv run ruff format --check
 
+      - name: Pyright
+        run: uv run pyright
+
       - name: Validate docker-compose.yml
         run: docker compose config --quiet
 
       - name: Unit tests
         run: uv run pytest -m "not integration" --cov --cov-report=term
+
+  integration:
+    # Postgres, Redis and SeaweedFS from docker-compose.yml. No Ollama on CI: the one live-LLM
+    # test skips itself; everything else uses fakes for the LLM and the listing site.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.22"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Start services
+        run: |
+          cp .env.example .env
+          docker compose up -d --build --wait postgres redis seaweedfs
+          docker compose up --exit-code-from seaweedfs-init seaweedfs-init
+
+      - name: Integration tests
+        # CI=true (set by GitHub) makes a missing service fail the run instead of skipping.
+        run: uv run pytest -m integration
+
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=200

@@ -41,8 +41,10 @@ class FakeSession:
         self.closed = True
 
 
-def respond(status: int = 200, content: bytes = FIXTURE, **headers: str) -> SimpleNamespace:
-    return SimpleNamespace(status_code=status, content=content, headers=headers)
+def respond(
+    status: int = 200, content: bytes = FIXTURE, headers: dict[str, str] | None = None
+) -> SimpleNamespace:
+    return SimpleNamespace(status_code=status, content=content, headers=headers or {})
 
 
 def make_source(*responses: Any) -> tuple[HuurwoningenSource, FakeSession]:
@@ -89,7 +91,7 @@ def test_other_urls_are_not_handled(url: str) -> None:
 
 
 async def test_fetch_parses_listing_and_keeps_raw_page() -> None:
-    source, session = make_source(respond(**{"content-type": "text/html; charset=UTF-8"}))
+    source, session = make_source(respond(headers={"content-type": "text/html; charset=UTF-8"}))
     fetched = await source.fetch(URL + "?utm_source=mail")
 
     assert session.requests == [(URL, 7)]  # canonical URL, configured timeout
@@ -134,7 +136,7 @@ async def test_fetch_rejects_urls_it_cannot_handle() -> None:
 async def test_http_errors_become_source_fetch_error(
     status: int, headers: dict[str, str], reason: str, retryable: bool
 ) -> None:
-    source, _ = make_source(respond(status, b"", **headers))
+    source, _ = make_source(respond(status, b"", headers))
     with pytest.raises(SourceFetchError, match=reason) as info:
         await source.fetch(URL)
     assert (info.value.status, info.value.retryable, info.value.url) == (status, retryable, URL)

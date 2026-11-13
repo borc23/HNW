@@ -22,6 +22,7 @@ from housing_netherlands.core.importing import ImportDeps, request_import
 from housing_netherlands.core.jobs import reconcile_job_log
 from housing_netherlands.core.models import FetchedListing, LLMParams, QueueJobState
 from housing_netherlands.core.models import JobStatus as LogStatus
+from housing_netherlands.core.ports import SourceAdapter
 from housing_netherlands.wiring import build_worker_settings, connect_blob_store
 from housing_netherlands.workers.main import HANDLERS
 from tests.fakes import FakeLLMClient, FakeSourceAdapter, HangingLLM, UnavailableLLM
@@ -39,7 +40,7 @@ Sessions = async_sessionmaker[AsyncSession]
 def make_worker(
     settings: Settings,
     sessions: Sessions,
-    source: FakeSourceAdapter,
+    source: SourceAdapter,
     llm: FakeLLMClient,
     job_timeout_s: float | None = None,
     *,
@@ -79,7 +80,7 @@ def make_worker(
 async def run_worker_until_idle(
     settings: Settings,
     sessions: Sessions,
-    source: FakeSourceAdapter,
+    source: SourceAdapter,
     llm: FakeLLMClient,
     job_timeout_s: float | None = None,
 ) -> None:

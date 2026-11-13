@@ -1,6 +1,6 @@
 [project]
 name = "housing-netherlands"
-version = "0.1.8"
+version = "0.1.9"
 description = "Personal housing dashboard for the Dutch rental market."
 readme = "README.md"
 authors = [
@@ -37,6 +37,7 @@ build-backend = "uv_build"
 dev = [
     "notebook>=7.6.5",
     "pre-commit>=4.7.0",
+    "pyright==1.1.408",
     "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=7.1.0",
@@ -64,6 +65,12 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["B011"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
