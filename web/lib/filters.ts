@@ -61,3 +61,15 @@ export function toQuery(filters: Filters): string {
 }
 
 export const hasFilters = (filters: Filters) => Object.keys(filters).length > 0;
+
+/** `filters` with one field changed; an empty value removes it. Validated like the URL. */
+export function withFilter(filters: Filters, name: keyof Filters, value: string): Filters {
+  const params = Object.fromEntries(new URLSearchParams(toQuery(filters)));
+  return parseFilters({ ...params, [name]: value });
+}
+
+/** The preset choices plus the current value, so a shared off-list value (1100) still shows. */
+export function choicesWith(choices: readonly number[], current: number | undefined): number[] {
+  const all = current === undefined ? [...choices] : [...new Set([...choices, current])];
+  return all.sort((a, b) => a - b);
+}

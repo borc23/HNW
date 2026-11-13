@@ -2,50 +2,63 @@
 
 import { ChevronDown, MapPin, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition, type FormEvent, type ReactNode } from "react";
-import { CHOICES, INTERIORS, hasFilters, parseFilters, toQuery, type Filters } from "@/lib/filters";
+import { useOptimistic, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import {
+  CHOICES,
+  INTERIORS,
+  choicesWith,
+  hasFilters,
+  toQuery,
+  withFilter,
+  type Filters,
+} from "@/lib/filters";
 import { formatRent } from "@/lib/format";
 import styles from "./SearchBar.module.css";
 
 /**
- * Location search plus filter chips. The URL holds the filters (shareable, back button works);
- * chips apply as soon as they change, the place applies on Search / Enter.
+ * Location search plus filter chips. The URL holds the applied filters (shareable, back button
+ * works). A chip changes only its own filter, immediately; the place applies on Search / Enter.
  */
 export function SearchBar({ filters, places }: { filters: Filters; places: string[] }) {
   const router = useRouter();
   const [searching, startSearch] = useTransition();
+  // Chips show the new value straight away, before the page has re-rendered.
+  const [shown, setShown] = useOptimistic(filters);
+  const place = usePlaceDraft(filters.place);
 
-  const apply = (form: HTMLFormElement) => {
-    const params = Object.fromEntries(new FormData(form)) as Record<string, string>;
-    const query = toQuery(parseFilters(params));
-    startSearch(() => router.push(query ? `/?${query}` : "/"));
-  };
+  const go = (next: Filters) =>
+    startSearch(() => {
+      setShown(next);
+      const query = toQuery(next);
+      router.push(query ? `/?${query}` : "/");
+    });
+
+  const set = (name: keyof Filters, value: string) => go(withFilter(shown, name, value));
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    apply(event.currentTarget);
+    set("place", place.value);
   };
 
   return (
-    // Keyed by the filters so the fields reset on back/forward navigation.
-    <form key={toQuery(filters)} className={styles.bar} onSubmit={onSubmit} role="search">
+    <form className={styles.bar} onSubmit={onSubmit} role="search">
       <div className={styles.searchRow}>
         <label className={styles.field}>
           <MapPin size={18} aria-hidden="true" className={styles.fieldIcon} />
           <span className="visually-hidden">Place</span>
           <input
-            name="place"
             type="search"
             list="places"
-            defaultValue={filters.place}
+            value={place.value}
+            onChange={(e) => place.set(e.target.value)}
             placeholder="Area, city or postcode"
             autoComplete="off"
             maxLength={100}
             className={styles.input}
           />
           <datalist id="places">
-            {places.map((place) => (
-              <option key={place} value={place} />
+            {places.map((name) => (
+              <option key={name} value={name} />
             ))}
           </datalist>
         </label>
@@ -55,47 +68,61 @@ export function SearchBar({ filters, places }: { filters: Filters; places: strin
         </button>
       </div>
 
-      <div className={styles.chips} onChange={(e) => apply(e.currentTarget.closest("form")!)}>
-        <Choice name="max_rent" label="Max rent" value={filters.max_rent} any="Any rent">
-          {CHOICES.max_rent.map((n) => (
+      <div className={styles.chips}>
+        <Choice
+          label="Max rent"
+          any="Any rent"
+          value={shown.max_rent}
+          onChange={(v) => set("max_rent", v)}
+        >
+          {choicesWith(CHOICES.max_rent, shown.max_rent).map((n) => (
             <option key={n} value={n}>
               Up to {formatRent(n)}
             </option>
           ))}
         </Choice>
-        <Choice name="min_rooms" label="Rooms" value={filters.min_rooms} any="Any rooms">
-          {CHOICES.min_rooms.map((n) => (
+        <Choice
+          label="Rooms"
+          any="Any rooms"
+          value={shown.min_rooms}
+          onChange={(v) => set("min_rooms", v)}
+        >
+          {choicesWith(CHOICES.min_rooms, shown.min_rooms).map((n) => (
             <option key={n} value={n}>
               {n}+ rooms
             </option>
           ))}
         </Choice>
-        <Choice name="min_area" label="Size" value={filters.min_area} any="Any size">
-          {CHOICES.min_area.map((n) => (
+        <Choice label="Size" any="Any size" value={shown.min_area} onChange={(v) => set("min_area", v)}>
+          {choicesWith(CHOICES.min_area, shown.min_area).map((n) => (
             <option key={n} value={n}>
               {n}+ m²
             </option>
           ))}
         </Choice>
-        <Choice name="interior" label="Interior" value={filters.interior} any="Any interior">
+        <Choice
+          label="Interior"
+          any="Any interior"
+          value={shown.interior}
+          onChange={(v) => set("interior", v)}
+        >
           {Object.entries(INTERIORS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
         </Choice>
-        <label className={`${styles.chip} ${filters.new_build ? styles.active : ""}`}>
+        <label className={`${styles.chip} ${shown.new_build ? styles.active : ""}`}>
           <input
             type="checkbox"
-            name="new_build"
-            value="true"
-            defaultChecked={filters.new_build}
+            checked={!!shown.new_build}
+            onChange={(e) => set("new_build", e.target.checked ? "true" : "")}
             className={styles.check}
           />
           New build
         </label>
-        {hasFilters(filters) && (
-          <button type="button" className={styles.clear} onClick={() => router.push("/")}>
+        {hasFilters(shown) && (
+          <button type="button" className={styles.clear} onClick={() => go({})}>
             <X size={16} aria-hidden="true" />
             Clear
           </button>
@@ -105,18 +132,32 @@ export function SearchBar({ filters, places }: { filters: Filters; places: strin
   );
 }
 
+/**
+ * The place being typed. It is a draft until submitted, so chips never send half-typed text;
+ * it re-syncs only when the applied place changes (back/forward, Clear).
+ */
+function usePlaceDraft(applied: string | undefined) {
+  const [value, set] = useState(applied ?? "");
+  const [synced, setSynced] = useState(applied);
+  if (applied !== synced) {
+    setSynced(applied);
+    set(applied ?? "");
+  }
+  return { value, set };
+}
+
 function Choice(props: {
-  name: string;
   label: string;
   any: string;
   value: string | number | undefined;
+  onChange: (value: string) => void;
   children: ReactNode;
 }) {
   const active = props.value !== undefined;
   return (
     <label className={`${styles.chip} ${styles.select} ${active ? styles.active : ""}`}>
       <span className="visually-hidden">{props.label}</span>
-      <select name={props.name} defaultValue={props.value ?? ""}>
+      <select value={props.value ?? ""} onChange={(e) => props.onChange(e.target.value)}>
         <option value="">{props.any}</option>
         {props.children}
       </select>
