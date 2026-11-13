@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import pytest
 
 from housing_netherlands.core.errors import (
+    EnqueueFailedError,
     LLMOutputInvalid,
     LLMUnavailableError,
     RetryLater,
@@ -101,9 +102,11 @@ async def test_request_import_marks_failed_if_enqueue_fails() -> None:
 
     log = FakeJobLog()
     sources = [FakeSourceAdapter("huurwoningen", "huurwoningen.nl")]
-    with pytest.raises(ConnectionError):
+    with pytest.raises(EnqueueFailedError) as exc_info:
         await request_import(BrokenQueue(), log, sources, URL)
-    [records] = log.records.values()
+    [(job_id, records)] = log.records.items()
+    assert exc_info.value.job_id == job_id  # caller can still show the job
+    assert isinstance(exc_info.value.__cause__, ConnectionError)
     assert [s for _, s, _ in records] == [JobStatus.QUEUED, JobStatus.FAILED]
     assert records[-1][2] == "enqueue: redis down"
 

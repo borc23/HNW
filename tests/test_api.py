@@ -151,3 +151,59 @@ async def test_page_shows_failed_job_error(client: TestClient, adapters: Adapter
     )
     page = client.get("/?job=j1").text
     assert "Job j1: <strong>failed</strong>" in page and "(HTTP 404)" in page
+
+
+# --- form failures always come back as the page, never raw JSON or a bare 500 --------------
+
+
+def _break_queue(adapters: Adapters) -> None:
+    async def down(*args: object, **kwargs: object) -> None:
+        raise ConnectionError("redis down")
+
+    adapters.queue.enqueue = down  # type: ignore[method-assign]
+
+
+@pytest.mark.parametrize("data", [{"url": "x" * 2049}, {"url": "   "}, {}])
+def test_form_rejects_bad_input_on_the_page(
+    client: TestClient, adapters: Adapters, data: dict
+) -> None:
+    response = client.post("/import", data=data)
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "<strong>Error:</strong> enter a listing URL of at most 2048 characters" in response.text
+    assert queued(adapters) == []
+
+
+def test_form_with_queue_down_shows_the_failed_job(client: TestClient, adapters: Adapters) -> None:
+    _break_queue(adapters)
+    response = client.post("/import", data={"url": URL}, follow_redirects=False)
+    assert response.status_code == 303
+    job_id = response.headers["location"].removeprefix("/?job=")
+
+    page = client.get(response.headers["location"]).text
+    assert f"Job {job_id}: <strong>failed</strong>" in page
+    assert "enqueue: redis down" in page
+
+
+def test_form_with_unexpected_error_shows_an_error_line(
+    client: TestClient, adapters: Adapters
+) -> None:
+    async def db_down(*args: object, **kwargs: object) -> None:
+        raise OSError("database down")
+
+    adapters.job_log.record = db_down  # type: ignore[method-assign]
+    response = client.post("/import", data={"url": URL})
+    assert response.status_code == 200
+    assert "could not queue the import; try again" in response.text
+    assert "database down" not in response.text  # details go to the log, not the page
+
+
+def test_api_with_queue_down_returns_503_with_job_id(
+    client: TestClient, adapters: Adapters
+) -> None:
+    _break_queue(adapters)
+    response = client.post("/api/listings/import", json={"url": URL})
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert client.get(f"/api/jobs/{detail['job_id']}").json()["status"] == "failed"
+    assert "ConnectionError: redis down" in detail["error"]

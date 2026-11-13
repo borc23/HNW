@@ -102,3 +102,12 @@ class LLMUnavailableError(DomainError):
         super().__init__(f"{model}: {reason}")
         self.model = model
         self.reason = reason
+
+
+class EnqueueFailedError(DomainError):
+    """The job was logged (and is now FAILED in `jobs_log`) but could not be queued."""
+
+    def __init__(self, job_id: str, reason: str) -> None:
+        super().__init__(f"job {job_id} could not be queued: {reason}")
+        self.job_id = job_id
+        self.reason = reason

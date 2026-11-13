@@ -15,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from housing_netherlands.config import get_settings
-from housing_netherlands.core.errors import UnsupportedUrlError
+from housing_netherlands.core.errors import EnqueueFailedError, UnsupportedUrlError
 from housing_netherlands.core.importing import request_import
 from housing_netherlands.core.models import JobRecord, ListingView
 from housing_netherlands.log import (
@@ -32,7 +32,8 @@ log = get_logger(__name__)
 AdaptersFactory = Callable[[], AbstractAsyncContextManager[Adapters]]
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
-Url = Annotated[str, Field(min_length=1, max_length=2048)]
+MAX_URL_LENGTH = 2048
+Url = Annotated[str, Field(min_length=1, max_length=MAX_URL_LENGTH)]
 
 
 class ImportRequest(BaseModel):
@@ -96,6 +97,9 @@ def create_app(adapters_factory: AdaptersFactory | None = None) -> FastAPI:
             return ImportAccepted(job_id=await queue_import(request, body.url))
         except UnsupportedUrlError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except EnqueueFailedError as exc:
+            detail = {"job_id": exc.job_id, "error": str(exc)}
+            raise HTTPException(status_code=503, detail=detail) from exc
 
     @app.get("/api/jobs/{job_id}")
     async def get_job(request: Request, job_id: str) -> JobRecord:
@@ -123,11 +127,20 @@ def create_app(adapters_factory: AdaptersFactory | None = None) -> FastAPI:
         return templates.TemplateResponse(request, "index.html", context)
 
     @app.post("/import")
-    async def import_form(request: Request, url: Annotated[Url, Form()]) -> RedirectResponse:
+    async def import_form(request: Request, url: Annotated[str, Form()] = "") -> RedirectResponse:
+        # A browser form always gets the page back, with the job or an error line.
+        url = url.strip()
         try:
+            if not url or len(url) > MAX_URL_LENGTH:
+                raise ValueError(f"enter a listing URL of at most {MAX_URL_LENGTH} characters")
             query = {"job": await queue_import(request, url)}
-        except UnsupportedUrlError as exc:
+        except EnqueueFailedError as exc:
+            query = {"job": exc.job_id}  # its FAILED status and reason show on the page
+        except (ValueError, UnsupportedUrlError) as exc:
             query = {"error": str(exc)}
+        except Exception:
+            log.exception("import.form_failed")
+            query = {"error": "could not queue the import; try again (details in the logs)"}
         return RedirectResponse(f"/?{urlencode(query)}", status_code=303)
 
     return app
