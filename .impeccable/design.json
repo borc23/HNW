@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-13T00:00:00Z",
+  "title": "Design System: NL Housing",
+  "extensions": {
+    "colorMeta": {
+      "action": {
+        "role": "primary",
+        "displayName": "Tomato",
+        "canonical": "oklch(58.4% 0.191 34)",
+        "tonalRamp": [
+          "#230000",
+          "#500000",
+          "#811500",
+          "#b62c04",
+          "#db5a3d",
+          "#f78c73",
+          "#ffbca8",
+          "#ffdccb"
+        ]
+      },
+      "action-hover": {
+        "role": "primary",
+        "displayName": "Deep Tomato",
+        "canonical": "oklch(52.3% 0.173 35)",
+        "tonalRamp": [
+          "#220000",
+          "#4d0700",
+          "#7c1e03",
+          "#b03615",
+          "#d56144",
+          "#f19078",
+          "#ffbfab",
+          "#ffdece"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Warm Cream",
+        "canonical": "oklch(95.6% 0.012 68)",
+        "tonalRamp": [
+          "#0d0b09",
+          "#292623",
+          "#484440",
+          "#6b655f",
+          "#8e8882",
+          "#b2ada8",
+          "#d7d3d0",
+          "#f1eeeb"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "oklch(100.0% 0.000 90)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#666666",
+          "#898989",
+          "#aeaeae",
+          "#d4d4d4",
+          "#eeeeee"
+        ]
+      },
+      "surface-sunk": {
+        "role": "neutral",
+        "displayName": "Oat Well",
+        "canonical": "oklch(93.3% 0.017 68)",
+        "tonalRamp": [
+          "#0d0b08",
+          "#2a2621",
+          "#4a443e",
+          "#6d655c",
+          "#908880",
+          "#b3ada6",
+          "#d8d3ce",
+          "#f2eee9"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Espresso Ink",
+        "canonical": "oklch(26.6% 0.012 56)",
+        "tonalRamp": [
+          "#0d0b09",
+          "#292623",
+          "#494440",
+          "#6b6560",
+          "#8e8883",
+          "#b2ada9",
+          "#d8d3d0",
+          "#f1eeeb"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Walnut Muted",
+        "canonical": "oklch(49.5% 0.020 56)",
+        "tonalRamp": [
+          "#0e0a08",
+          "#2b2521",
+          "#4c433d",
+          "#6f645c",
+          "#92877f",
+          "#b5aca6",
+          "#dad3ce",
+          "#f3ede9"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Linen Line",
+        "canonical": "oklch(90.1% 0.022 70)",
+        "tonalRamp": [
+          "#0e0b07",
+          "#2b2520",
+          "#4b443b",
+          "#6e645a",
+          "#91877d",
+          "#b5aca4",
+          "#d9d3cc",
+          "#f3ede8"
+        ]
+      },
+      "ok": {
+        "role": "status",
+        "displayName": "Leaf",
+        "canonical": "oklch(46.6% 0.097 153)",
+        "tonalRamp": [
+          "#001004",
+          "#0a2e19",
+          "#205032",
+          "#37754d",
+          "#5e9871",
+          "#8dbb9a",
+          "#bbdfc5",
+          "#dbf7e2"
+        ]
+      },
+      "ok-tint": {
+        "role": "status",
+        "displayName": "Mint Tint",
+        "canonical": "oklch(94.5% 0.021 152)",
+        "tonalRamp": [
+          "#090c09",
+          "#222823",
+          "#3f4841",
+          "#5e6961",
+          "#818d84",
+          "#a7b1a9",
+          "#cfd6d1",
+          "#eaf0ec"
+        ]
+      },
+      "problem": {
+        "role": "status",
+        "displayName": "Brick",
+        "canonical": "oklch(48.1% 0.168 30)",
+        "tonalRamp": [
+          "#210000",
+          "#4c0804",
+          "#7c1f16",
+          "#ae362a",
+          "#d46151",
+          "#f09081",
+          "#ffbeb2",
+          "#ffded3"
+        ]
+      },
+      "problem-tint": {
+        "role": "status",
+        "displayName": "Blush Tint",
+        "canonical": "oklch(94.1% 0.024 30)",
+        "tonalRamp": [
+          "#0f0a09",
+          "#2d2422",
+          "#4e423f",
+          "#72625e",
+          "#958582",
+          "#b8aaa8",
+          "#dcd1cf",
+          "#f5ecea"
+        ]
+      },
+      "action-ink": {
+        "role": "primary",
+        "displayName": "Tomato Ink",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#666666",
+          "#898989",
+          "#aeaeae",
+          "#d4d4d4",
+          "#eeeeee"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The one section heading per page."
+      },
+      "price": {
+        "displayName": "Price",
+        "purpose": "Card rent; suffix drops to label size, muted."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, panel prompt, notice titles, brand name."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Summary sentences and notice text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Facts, place line, hints, status, button text (600 to 800)."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-rest",
+        "value": "0 1px 2px rgb(42 36 32 / 0.05), 0 10px 28px -12px rgb(42 36 32 / 0.16)",
+        "purpose": "Every white container at rest."
+      },
+      {
+        "name": "card-hover",
+        "value": "0 1px 2px rgb(42 36 32 / 0.05), 0 18px 36px -14px rgb(42 36 32 / 0.24)",
+        "purpose": "Listing card hover lift."
+      }
+    ],
+    "motion": [
+      {
+        "name": "spring",
+        "value": "cubic-bezier(0.34, 1.4, 0.64, 1)",
+        "purpose": "Press feedback only: button scale 0.96 over 280ms, card scale 0.98 over 320ms."
+      },
+      {
+        "name": "colour-change",
+        "value": "160ms ease-out",
+        "purpose": "Background and border colour transitions."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "All transitions and animations collapse under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stack-paste-form",
+        "value": "520px"
+      },
+      {
+        "name": "grid-track-min",
+        "value": "300px"
+      }
+    ],
+    "focus": {
+      "value": "3px solid var(--action); outline-offset: 3px; border-radius: 8px",
+      "purpose": "Global focus-visible ring."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one main action on a surface (\"Add it\"). Tomato only while pressable; springs on press.",
+      "html": "<button class=\"ds-btn-primary\">Add it</button> <button class=\"ds-btn-primary\" disabled>Adding…</button>",
+      "css": ".ds-btn-primary{min-height:52px;padding:0 24px;border:0;border-radius:var(--radius-inner,16px);background:var(--action,#d4401c);color:var(--action-ink,#fff);font:800 1rem/1 Nunito,ui-rounded,system-ui,sans-serif;cursor:pointer;transition:background-color 160ms ease-out,transform 280ms cubic-bezier(0.34,1.4,0.64,1)}.ds-btn-primary:hover{background:var(--action-hover,#b8350f)}.ds-btn-primary:active{transform:scale(0.96)}.ds-btn-primary:focus-visible{outline:3px solid var(--action,#d4401c);outline-offset:3px}.ds-btn-primary:disabled{background:var(--line,#e8dccf);color:var(--ink-muted,#6b5f57);cursor:progress;transform:none}"
+    },
+    {
+      "name": "Card Pill",
+      "kind": "button",
+      "refersTo": "button-card-cta",
+      "description": "The pressable cue in a listing card footer (\"Have a look\"); darkens when the card is hovered.",
+      "html": "<span class=\"ds-pill\">Have a look <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 7h10v10\"/><path d=\"M7 17 17 7\"/></svg></span>",
+      "css": ".ds-pill{display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 14px;border-radius:12px;background:var(--action,#d4401c);color:var(--action-ink,#fff);font:800 0.875rem/1 Nunito,ui-rounded,system-ui,sans-serif;cursor:pointer;transition:background-color 160ms ease-out}.ds-pill:hover{background:var(--action-hover,#b8350f)}"
+    },
+    {
+      "name": "Paste Input",
+      "kind": "input",
+      "refersTo": "input-paste",
+      "description": "Sunken oat well that lifts to white with a tomato border on focus.",
+      "html": "<input class=\"ds-input\" type=\"url\" placeholder=\"Paste a huurwoningen.nl link\">",
+      "css": ".ds-input{min-height:52px;width:100%;padding:0 18px;border:2px solid transparent;border-radius:var(--radius-inner,16px);background:var(--surface-sunk,#f1e7dd);color:var(--ink,#2a2420);font:400 1rem/1.5 Nunito,ui-rounded,system-ui,sans-serif;caret-color:var(--action,#d4401c);transition:border-color 160ms ease-out,background-color 160ms ease-out}.ds-input::placeholder{color:var(--ink-muted,#6b5f57)}.ds-input:hover{background:var(--surface-sunk,#f1e7dd)}.ds-input:focus,.ds-input:focus-visible{outline:none;border-color:var(--action,#d4401c);background:var(--surface,#fff)}"
+    },
+    {
+      "name": "Listing Card",
+      "kind": "card",
+      "refersTo": "card-listing",
+      "description": "Photo-led home card: 24px outer, 16px photo, one-sentence note, rent and pill footer; soft spring on press.",
+      "html": "<a class=\"ds-card\" href=\"#\"><div class=\"ds-card-photo\"></div><div class=\"ds-card-body\"><h3 class=\"ds-card-title\">Apartment Rosveld</h3><p class=\"ds-card-place\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/></svg>Zuidwijk, Rotterdam</p><p class=\"ds-card-note\">A ground-floor apartment with 3 rooms in the Zuidwijk neighbourhood.</p><p class=\"ds-card-facts\">63 m² · 3 rooms · 2 bedrooms</p><div class=\"ds-card-foot\"><p class=\"ds-card-rent\">€758<span> / month</span></p><span class=\"ds-card-pill\">Have a look <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 7h10v10\"/><path d=\"M7 17 17 7\"/></svg></span></div></div></a>",
+      "css": ".ds-card{display:flex;flex-direction:column;max-width:340px;padding:10px;border-radius:24px;background:var(--surface,#fff);color:var(--ink,#2a2420);text-decoration:none;font-family:Nunito,ui-rounded,system-ui,sans-serif;box-shadow:0 1px 2px rgb(42 36 32/.05),0 10px 28px -12px rgb(42 36 32/.16);transition:transform 320ms cubic-bezier(0.34,1.4,0.64,1),box-shadow 200ms ease-out}.ds-card:hover{box-shadow:0 1px 2px rgb(42 36 32/.05),0 18px 36px -14px rgb(42 36 32/.24)}.ds-card:active{transform:scale(0.98)}.ds-card:focus-visible{outline:3px solid var(--action,#d4401c);outline-offset:3px}.ds-card-photo{aspect-ratio:4/3;border-radius:16px;background:var(--surface-sunk,#f1e7dd)}.ds-card-body{padding:14px 8px 6px}.ds-card-title{margin:0;font-size:1.1875rem;font-weight:800;line-height:1.25}.ds-card-place{display:flex;align-items:center;gap:4px;margin:2px 0 0;color:var(--ink-muted,#6b5f57);font-size:.875rem;font-weight:600}.ds-card-note{margin:10px 0 0;line-height:1.5}.ds-card-facts{margin:10px 0 0;font-size:.875rem;font-weight:700}.ds-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:16px}.ds-card-rent{margin:0;font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums}.ds-card-rent span{font-size:.875rem;font-weight:600;color:var(--ink-muted,#6b5f57)}.ds-card-pill{display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 14px;border-radius:12px;background:var(--action,#d4401c);color:#fff;font-size:.875rem;font-weight:800;transition:background-color 160ms ease-out}.ds-card:hover .ds-card-pill{background:var(--action-hover,#b8350f)}"
+    },
+    {
+      "name": "Status Line",
+      "kind": "custom",
+      "refersTo": "status-ok",
+      "description": "Tinted strip under the paste input for working, done and failed imports.",
+      "html": "<p class=\"ds-status ds-status-ok\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/></svg>Added. It's at the top of your homes below.</p>",
+      "css": ".ds-status{display:flex;align-items:flex-start;gap:8px;margin:0;padding:10px 14px;border-radius:12px;font:600 .875rem/1.5 Nunito,ui-rounded,system-ui,sans-serif}.ds-status svg{flex:none;margin-top:1px}.ds-status-ok{background:var(--ok-tint,#e3f1e6);color:var(--ok,#24693f)}.ds-status-working{background:var(--surface-sunk,#f1e7dd);color:var(--ink,#2a2420)}.ds-status-problem{background:var(--problem-tint,#fbe6e2);color:var(--problem,#a8261b)}"
+    },
+    {
+      "name": "Brand Row",
+      "kind": "nav",
+      "description": "Ink tile with house icon beside the product name; the only header content until a second page exists.",
+      "html": "<a class=\"ds-brand\" href=\"#\"><span class=\"ds-brand-mark\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/></svg></span>NL Housing</a>",
+      "css": ".ds-brand{display:inline-flex;align-items:center;gap:10px;min-height:44px;color:var(--ink,#2a2420);font:800 1.1875rem/1.2 Nunito,ui-rounded,system-ui,sans-serif;text-decoration:none}.ds-brand:hover{text-decoration:underline;text-underline-offset:.2em}.ds-brand:focus-visible{outline:3px solid var(--action,#d4401c);outline-offset:3px;border-radius:8px}.ds-brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:var(--ink,#2a2420);color:var(--ground,#f6efe8)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Homes You'd Love",
+    "overview": "A warm consumer app, not a property portal. The screen is a warm tinted ground with soft white cards floating on it; each card is photo-led and speaks in one plain English sentence before it gives you numbers. Density is relaxed: one paste panel, then a grid of generous cards, with nothing above them that looks like a filter bar or a results table.\n\nColour does one job. A single saturated tomato appears only on things you can press, so a glance at the page tells you exactly what can be done. Everything else is warm neutrals: cream ground, white surfaces, a sunken oat tone for wells and placeholders, and a dark brown-black ink. Type is Nunito throughout, a rounded humanist sans used heavy (800) for anything that names a thing and regular for reading.\n\nMotion is reserved for touch. Pressing a card or the main button gives a small spring scale; nothing bounces in on load, nothing animates for decoration. Copy is written like a person talking to a couple (\"Found a place you like?\", \"We're reading it now\", \"Have a look\").",
+    "keyCharacteristics": [
+      "Warm cream ground with white, softly shadowed cards.",
+      "One action colour (tomato), only on pressable things.",
+      "Two nested radii: 24px outside, 16px inside.",
+      "Nunito at 800 for names and prices, 400 for reading.",
+      "Soft spring on press only.",
+      "Plain-language, second-person copy."
+    ],
+    "rules": [
+      {
+        "name": "The Pressable-Only Rule",
+        "body": "Tomato marks what can be pressed and nothing else. When a control stops being pressable (disabled, busy) it loses tomato entirely and falls back to Linen Line with muted ink.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tinted-Status Rule",
+        "body": "Status is shown as a tinted strip with dark text of the same hue, never as a saturated filled block that could compete with the action colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight-Not-Face Rule",
+        "body": "Hierarchy is made with Nunito weight and size. Don't introduce a second family, uppercase tracking, or small-caps labels above headings.",
+        "section": "typography"
+      },
+      {
+        "name": "The Ink-Tinted Shadow Rule",
+        "body": "Shadows are tinted with the ink colour (42 36 32), never neutral black, and are always soft and diffuse.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** reserve tomato for controls a person can press, and remove it the moment a control can't be pressed.",
+      "**Do** nest radii: 24px containers, 16px contents, 12px small pills and strips.",
+      "**Do** put content on white cards with the ink-tinted soft shadow, on the warm cream ground, with no card borders.",
+      "**Do** use the spring curve (`cubic-bezier(0.34, 1.4, 0.64, 1)`) only for press feedback (scale 0.96 to 0.98); use 160ms ease-out for colour changes.",
+      "**Do** write labels and states as a person would say them (\"Add it\", \"Have a look\", \"We're reading it now\").",
+      "**Do** use line icons inline at 15px to 28px beside text, never as decoration on their own."
+    ],
+    "donts": [
+      "**Don't** use tomato for headings, icons at rest, status, links in prose, or decoration.",
+      "**Don't** show an error in a colour that could be mistaken for the action colour; errors use Brick on Blush Tint.",
+      "**Don't** animate on entry or scroll; motion answers touch only.",
+      "**Don't** add a filter bar, results table, or photo-left list rows; the feed is a grid of photo-led cards.",
+      "**Don't** add uppercase eyebrows or kickers above headings; Nunito weight carries hierarchy."
+    ]
+  }
+}

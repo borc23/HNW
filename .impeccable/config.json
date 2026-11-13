@@ -1,0 +1,62 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-13T13:15:16.032Z",
+        "reason": "agent: canon card deliberately reproduces the category-standard look (Inter, from the discarded home-design-v1 handoff)"
+      },
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-warm.html"
+        ],
+        "createdAt": "2026-11-13T13:24:54.094Z",
+        "reason": "agent: the catalog challenger's own grammar specifies a warm tinted ground; sketch reproduces that world for comparison"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.34, 1.4, 0.64, 1)",
+        "files": [
+          "web/app/globals.css"
+        ],
+        "createdAt": "2026-11-13T13:36:30.889Z",
+        "reason": "agent: chosen world's signature is a soft spring on press only (catalog grammar), never on entry"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-13T13:44:15.296Z",
+        "reason": "agent: unchosen decision-round sketch of a different world; not shipped UI, kept only as the spent hand"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned-woonblad.html"
+        ],
+        "createdAt": "2026-11-13T13:44:15.309Z",
+        "reason": "agent: unchosen decision-round sketch of a different world; not shipped UI, kept only as the spent hand"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick-fandeck.html"
+        ],
+        "createdAt": "2026-11-13T13:44:15.323Z",
+        "reason": "agent: unchosen decision-round sketch of a different world; not shipped UI, kept only as the spent hand"
+      }
+    ]
+  }
+}

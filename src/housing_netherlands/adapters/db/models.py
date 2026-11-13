@@ -57,6 +57,8 @@ class ListingRow(Base):
     bedrooms: Mapped[int | None]
     postcode: Mapped[str | None] = mapped_column(Text)
     city: Mapped[str | None] = mapped_column(Text)
+    neighbourhood: Mapped[str | None] = mapped_column(Text)
+    image_url: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
     raw_blob_key: Mapped[str] = mapped_column(Text)
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

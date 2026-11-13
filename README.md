@@ -30,6 +30,17 @@ second).
 | `migrate` | one-shot `alembic upgrade head` before `api` and `worker` start |
 | `postgres` `redis` `seaweedfs` `ollama` | database (PostGIS + pgvector), queue, S3 raw pages, LLM |
 
+### Web app
+
+The feed lives in `web/` (Next.js). It talks to the API above from the server side, so the API
+URL is plain configuration (`API_URL`, default `http://localhost:8000`; see `web/.env.example`).
+
+```bash
+cd web
+npm install
+npm run dev          # http://localhost:3000
+```
+
 ### JSON API
 
 ```bash

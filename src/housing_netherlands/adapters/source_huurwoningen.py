@@ -54,9 +54,11 @@ def to_listing(details: ListingDetails, url: str) -> Listing:
         address_text=", ".join(p for p in (details.street, locality) if p) or None,
         postcode=details.postcode,
         city=details.city,
+        neighbourhood=details.neighbourhood,
         latitude=details.latitude,
         longitude=details.longitude,
         description=details.description,
+        image_url=details.image_url,
     )
 
 
