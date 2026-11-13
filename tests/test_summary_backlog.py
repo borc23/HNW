@@ -45,7 +45,7 @@ async def test_summarises_pending_newest_first_and_clears_the_flag() -> None:
     llm = FakeLLMClient(SUMMARY, SUMMARY)
     deps, ids = await deps_with_pending(llm, 2)
 
-    assert await summarize_pending(deps, budget_s=60) == 2
+    assert await summarize_pending(deps, budget_s=60, backoff={}) == 2
 
     assert await deps.listings.pending_summaries(limit=10) == []
     first_prompt = llm.calls[0][1].content
@@ -58,20 +58,45 @@ async def test_summarises_pending_newest_first_and_clears_the_flag() -> None:
 async def test_stops_when_the_budget_is_spent() -> None:
     deps, _ = await deps_with_pending(FakeLLMClient(SUMMARY, SUMMARY), 2)
     ticks = count()  # each clock() call advances one second
-    assert await summarize_pending(deps, budget_s=1.5, clock=lambda: next(ticks)) == 1
+    assert await summarize_pending(deps, budget_s=1.5, backoff={}, clock=lambda: next(ticks)) == 1
     assert len(await deps.listings.pending_summaries(limit=10)) == 1
 
 
-async def test_llm_down_stops_and_keeps_the_flag() -> None:
-    deps, ids = await deps_with_pending(DownLLM(), 2)
-    assert await summarize_pending(deps, budget_s=60) == 0
+async def test_llm_down_stops_after_two_failures_and_keeps_the_flags() -> None:
+    deps, ids = await deps_with_pending(DownLLM(), 3)
+    backoff: dict[int, float] = {}
+    assert await summarize_pending(deps, budget_s=60, backoff=backoff) == 0
+    assert len(backoff) == 2  # two tried, then it stopped
     assert sorted(await deps.listings.pending_summaries(limit=10)) == ids
+
+
+class SlowOnFirstLLM(FakeLLMClient):
+    """Times out on the newest listing's prompt, answers the others."""
+
+    async def complete(self, messages, *, params, json_schema=None) -> LLMResponse:  # type: ignore[override]
+        if "Flat 1" in messages[1].content:
+            raise LLMUnavailableError(params.model, "Timeout")
+        return await super().complete(messages, params=params, json_schema=json_schema)
+
+
+async def test_a_listing_too_slow_to_summarise_steps_aside() -> None:
+    deps, ids = await deps_with_pending(SlowOnFirstLLM(SUMMARY, SUMMARY), 2)
+    now = [0.0]
+    backoff: dict[int, float] = {}
+
+    assert await summarize_pending(deps, budget_s=60, backoff=backoff, clock=lambda: now[0]) == 1
+    assert await deps.listings.pending_summaries(limit=10) == [ids[1]]  # the slow one waits
+    assert await summarize_pending(deps, budget_s=60, backoff=backoff, clock=lambda: now[0]) == 0
+
+    now[0] = 3601.0  # an hour later it is tried again, and waits another hour
+    assert await summarize_pending(deps, budget_s=60, backoff=backoff, clock=lambda: now[0]) == 0
+    assert backoff == {ids[1]: 3601.0 + 3600.0}
 
 
 async def test_a_listing_that_cannot_be_summarised_does_not_block_the_rest() -> None:
     # invalid JSON twice for the newest listing (one retry), then a good one for the next
     deps, ids = await deps_with_pending(FakeLLMClient("nope", "still nope", SUMMARY), 2)
-    assert await summarize_pending(deps, budget_s=60) == 1
+    assert await summarize_pending(deps, budget_s=60, backoff={}) == 1
     assert await deps.listings.pending_summaries(limit=10) == []
     assert (await deps.listings.get_view(ids[0])).summary is not None  # type: ignore[union-attr]
     assert (await deps.listings.get_view(ids[1])).summary is None  # type: ignore[union-attr]
