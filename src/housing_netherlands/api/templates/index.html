@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>NL Housing</title>
+</head>
+<body>
+  <h1>NL Housing</h1>
+
+  <form method="post" action="/import">
+    <input name="url" type="url" size="80" required
+           placeholder="https://www.huurwoningen.nl/huren/rotterdam/...">
+    <button type="submit">Import</button>
+  </form>
+
+  {% if error %}<p><strong>Error:</strong> {{ error }}</p>{% endif %}
+  {% if job %}
+    <p>Job {{ job.job_id }}: <strong>{{ job.status.value }}</strong>
+       {% if job.error %}({{ job.error }}){% endif %}
+       <a href="/?job={{ job.job_id }}">refresh</a></p>
+  {% endif %}
+
+  <h2>Listings ({{ listings | length }})</h2>
+  <table border="1" cellpadding="4">
+    <tr><th>Listing</th><th>Rent</th><th>m²</th><th>Rooms</th><th>Summary</th></tr>
+    {% for view in listings %}
+      {% set l = view.listing %}
+      <tr>
+        <td><a href="{{ l.url }}">{{ l.title }}</a><br>{{ l.city or "" }}</td>
+        <td>{{ "€%d" | format(l.price_eur) if l.price_eur is not none else "?" }}</td>
+        <td>{{ l.area_m2 or "?" }}</td>
+        <td>{{ l.rooms or "?" }}</td>
+        <td>
+          {% if view.summary %}
+            {{ view.summary.summary_en }}
+            <ul>{% for fact in view.summary.key_facts %}<li>{{ fact }}</li>{% endfor %}</ul>
+          {% else %}<em>summary pending</em>{% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">No listings yet.</td></tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

@@ -34,6 +34,15 @@ class UnfinishedJob(BaseModel):
     job_type: str
 
 
+class JobRecord(BaseModel):
+    """A `jobs_log` row as shown to the user."""
+
+    job_id: str
+    job_type: str
+    status: JobStatus
+    error: str | None = None
+
+
 class Listing(BaseModel):
     """One ad on one source, normalised from whatever the source returns."""
 

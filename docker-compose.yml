@@ -109,6 +109,29 @@ services:
         condition: service_healthy
     restart: "no"
 
+  api:
+    image: housing-netherlands-app
+    command: ["uvicorn", "housing_netherlands.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      seaweedfs-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   worker:
     image: housing-netherlands-app
     command: ["arq", "housing_netherlands.workers.main.WorkerSettings"]
