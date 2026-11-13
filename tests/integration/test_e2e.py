@@ -18,6 +18,7 @@ from housing_netherlands.config import Settings
 from housing_netherlands.wiring import build_adapters, connect_blob_store
 from tests.fakes import FakeLLMClient
 from tests.integration.test_worker import run_worker_until_idle
+from tests.redirects import redirected_job_id
 from tests.test_source_huurwoningen import FIXTURE, FakeSession, respond
 
 PASTED_URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/?utm_source=mail"
@@ -48,9 +49,8 @@ async def test_pasted_url_ends_up_on_the_page_with_its_summary(
 ) -> None:
     # 1. Paste the URL in the form, as a user would.
     response = client.post("/import", data={"url": PASTED_URL}, follow_redirects=False)
-    assert response.status_code == 303
+    job_id = redirected_job_id(response)
     job_page = response.headers["location"]
-    job_id = job_page.removeprefix("/?job=")
     assert f"Job {job_id}: <strong>queued</strong>" in client.get(job_page).text
 
     # 2. The worker runs the import.
