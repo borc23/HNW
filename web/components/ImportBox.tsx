@@ -34,7 +34,7 @@ export function ImportBox() {
           required
           inputMode="url"
           autoComplete="off"
-          placeholder="Found a place? Paste its link"
+          placeholder="Paste a listing link"
           className={styles.input}
         />
         <button type="submit" className={styles.button} disabled={busy}>

@@ -1,6 +1,5 @@
 import { House, PlugZap } from "lucide-react";
 import type { ReactNode } from "react";
-import { ImportBox } from "@/components/ImportBox";
 import { ListingCard } from "@/components/ListingCard";
 import { ApiError, api, type ListingView } from "@/lib/api";
 import styles from "./page.module.css";
@@ -12,7 +11,6 @@ export default async function FeedPage() {
 
   return (
     <main className={styles.main}>
-      <ImportBox />
       <section className={styles.feed} aria-labelledby="feed-title">
         <div className={styles.head}>
           <h1 id="feed-title" className={styles.title}>
