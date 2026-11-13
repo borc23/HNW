@@ -14,7 +14,7 @@ from housing_netherlands.adapters.queue_arq import ArqJobQueue, worker_settings
 from housing_netherlands.adapters.source_huurwoningen import HuurwoningenSource
 from housing_netherlands.config import Settings
 from housing_netherlands.core.importing import ImportDeps
-from housing_netherlands.core.jobs import JobHandler, Lifecycle
+from housing_netherlands.core.jobs import JobHandler, Lifecycle, PeriodicTask
 from housing_netherlands.core.models import LLMParams
 from housing_netherlands.core.ports import (
     BlobStore,
@@ -149,6 +149,7 @@ def build_worker_settings(
     handlers: dict[str, JobHandler],
     on_startup: Lifecycle,
     on_shutdown: Lifecycle,
+    periodic: dict[str, PeriodicTask] | None = None,
 ) -> type:
     """The queue backend's worker runner for these handlers."""
     # Upper bound for one attempt: fetch + archive + LLM call and its one retry, plus margin.
@@ -158,6 +159,7 @@ def build_worker_settings(
             return worker_settings(
                 redis_url=settings.redis_url,
                 handlers=handlers,
+                periodic=periodic,
                 on_startup=on_startup,
                 on_shutdown=on_shutdown,
                 max_tries=settings.import_max_attempts + INTERRUPTED_RUN_ALLOWANCE,

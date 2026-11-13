@@ -19,7 +19,9 @@ from housing_netherlands.adapters.queue_arq import ArqJobQueue
 from housing_netherlands.config import Settings
 from housing_netherlands.core.errors import SourceFetchError, SourceParseError
 from housing_netherlands.core.importing import ImportDeps, request_import
-from housing_netherlands.core.models import FetchedListing, LLMParams
+from housing_netherlands.core.jobs import reconcile_job_log
+from housing_netherlands.core.models import FetchedListing, LLMParams, QueueJobState
+from housing_netherlands.core.models import JobStatus as LogStatus
 from housing_netherlands.wiring import build_worker_settings, connect_blob_store
 from housing_netherlands.workers.main import HANDLERS
 from tests.fakes import FakeLLMClient, FakeSourceAdapter, HangingLLM
@@ -216,3 +218,54 @@ async def test_job_interrupted_by_shutdown_on_its_last_attempt_still_completes(
 
     assert source.fetched_urls == [URL, URL]  # the restarted worker ran the job again
     assert await job_row(sessions, job_id) == ("succeeded", None)
+
+
+async def backdate_jobs(sessions: Sessions) -> None:
+    async with sessions.begin() as s:
+        await s.execute(text("UPDATE jobs_log SET created_at = now() - interval '10 minutes'"))
+
+
+async def test_job_ended_by_arq_without_the_handler_is_reconciled(
+    settings: Settings, sessions: Sessions
+) -> None:
+    # arq fails some jobs without ever calling the handler (here: function not found; same path
+    # as expired / aborted before start / max retries exceeded), so jobs_log stays QUEUED.
+    job_log = SqlJobLog(sessions)
+    queue = await ArqJobQueue.connect(settings.redis_url)
+    try:
+        await job_log.record("orphan", job_type="no_such_job", status=LogStatus.QUEUED)
+        await queue.enqueue("no_such_job", {}, job_id="orphan")
+        source = FakeSourceAdapter("huurwoningen", "huurwoningen.nl", FETCHED)
+        await run_worker_until_idle(settings, sessions, source, FakeLLMClient())
+        assert await job_row(sessions, "orphan") == ("queued", None)  # the gap
+
+        info = await queue.job_info("orphan")
+        assert info.state is QueueJobState.DONE and info.success is False
+
+        await backdate_jobs(sessions)
+        assert await reconcile_job_log(job_log, queue) == 1
+        assert await reconcile_job_log(job_log, queue) == 0  # idempotent
+    finally:
+        await queue.close()
+
+    status, error = await job_row(sessions, "orphan")
+    assert status == "failed"
+    assert error == "ended by the queue: JobExecutionFailed: function 'no_such_job' not found"
+
+
+async def test_reconcile_leaves_finished_and_running_jobs_alone(
+    settings: Settings, sessions: Sessions
+) -> None:
+    source = FakeSourceAdapter("huurwoningen", "huurwoningen.nl", FETCHED)
+    done = await enqueue(settings, sessions, source)
+    await run_worker_until_idle(settings, sessions, source, FakeLLMClient(SUMMARY))
+    waiting = await enqueue(settings, sessions, source)  # queued, no worker running
+
+    await backdate_jobs(sessions)
+    queue = await ArqJobQueue.connect(settings.redis_url)
+    try:
+        assert await reconcile_job_log(SqlJobLog(sessions), queue) == 0
+    finally:
+        await queue.close()
+    assert (await job_row(sessions, done))[0] == "succeeded"
+    assert (await job_row(sessions, waiting))[0] == "queued"

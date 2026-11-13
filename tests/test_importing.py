@@ -89,8 +89,8 @@ async def test_request_import_rejects_unsupported_url_and_queues_nothing() -> No
 
 
 async def test_request_import_marks_failed_if_enqueue_fails() -> None:
-    class BrokenQueue:
-        async def enqueue(self, *args: object, **kwargs: object) -> None:
+    class BrokenQueue(FakeJobQueue):
+        async def enqueue(self, job_name: str, payload: dict, *, job_id: str) -> None:
             raise ConnectionError("redis down")
 
     log = FakeJobLog()

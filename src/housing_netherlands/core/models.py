@@ -14,6 +14,26 @@ class JobStatus(StrEnum):
     FAILED = "failed"
 
 
+class QueueJobState(StrEnum):
+    PENDING = "pending"  # queued or deferred (e.g. waiting for a retry)
+    RUNNING = "running"
+    DONE = "done"  # finished; see `success` / `error`
+    UNKNOWN = "unknown"  # the queue has no record (never queued, expired, result discarded)
+
+
+class QueueJobInfo(BaseModel):
+    """The queue's own view of a job, used to reconcile `jobs_log` with what really happened."""
+
+    state: QueueJobState
+    success: bool | None = None
+    error: str | None = None
+
+
+class UnfinishedJob(BaseModel):
+    job_id: str
+    job_type: str
+
+
 class Listing(BaseModel):
     """One ad on one source, normalised from whatever the source returns."""
 

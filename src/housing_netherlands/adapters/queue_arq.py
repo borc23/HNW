@@ -5,10 +5,14 @@ from typing import Any, Self
 
 from arq import Retry, create_pool
 from arq.connections import ArqRedis, RedisSettings
+from arq.cron import CronJob, cron
+from arq.jobs import Job
+from arq.jobs import JobStatus as ArqJobStatus
 from arq.worker import Function, func
 
 from housing_netherlands.core.errors import DuplicateJobError, RetryLater
-from housing_netherlands.core.jobs import JobContext, JobHandler, Lifecycle
+from housing_netherlands.core.jobs import JobContext, JobHandler, Lifecycle, PeriodicTask
+from housing_netherlands.core.models import QueueJobInfo, QueueJobState
 from housing_netherlands.log import bind_context, clear_context
 
 
@@ -32,6 +36,19 @@ class ArqJobQueue:
         if await self._pool.enqueue_job(job_name, _job_id=job_id, **payload) is None:
             raise DuplicateJobError(job_id)
 
+    async def job_info(self, job_id: str) -> QueueJobInfo:
+        job = Job(job_id, self._pool)
+        status = await job.status()
+        if status in (ArqJobStatus.queued, ArqJobStatus.deferred):
+            return QueueJobInfo(state=QueueJobState.PENDING)
+        if status is ArqJobStatus.in_progress:
+            return QueueJobInfo(state=QueueJobState.RUNNING)
+        result = await job.result_info() if status is ArqJobStatus.complete else None
+        if result is None:  # not found, or the result was already discarded
+            return QueueJobInfo(state=QueueJobState.UNKNOWN)
+        error = None if result.success else f"{type(result.result).__name__}: {result.result}"
+        return QueueJobInfo(state=QueueJobState.DONE, success=result.success, error=error)
+
     async def close(self) -> None:
         await self._pool.aclose()
 
@@ -50,10 +67,19 @@ def _arq_job(name: str, handler: JobHandler, *, max_tries: int, timeout_s: float
     return func(run, name=name, max_tries=max_tries, timeout=timeout_s)
 
 
+def _arq_cron(name: str, task: PeriodicTask) -> CronJob:
+    async def run(ctx: dict[str, Any]) -> Any:
+        return await task(ctx)
+
+    # every minute at :00; unique=True keeps it to one run at a time across workers
+    return cron(run, name=name, second=0, unique=True, run_at_startup=True)
+
+
 def worker_settings(
     *,
     redis_url: str,
     handlers: dict[str, JobHandler],
+    periodic: dict[str, PeriodicTask] | None = None,
     on_startup: Lifecycle,
     on_shutdown: Lifecycle,
     max_tries: int,
@@ -80,6 +106,7 @@ def worker_settings(
                 _arq_job(name, h, max_tries=max_tries, timeout_s=job_timeout_s)
                 for name, h in handlers.items()
             ],
+            "cron_jobs": [_arq_cron(name, t) for name, t in (periodic or {}).items()],
             "redis_settings": RedisSettings.from_dsn(redis_url),
             "on_startup": startup,
             "on_shutdown": shutdown,

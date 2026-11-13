@@ -14,6 +14,9 @@ from housing_netherlands.core.models import (
     LLMMessage,
     LLMParams,
     LLMResponse,
+    QueueJobInfo,
+    QueueJobState,
+    UnfinishedJob,
 )
 
 
@@ -22,11 +25,19 @@ class FakeJobQueue:
 
     def __init__(self) -> None:
         self.jobs: list[tuple[str, dict[str, Any], str]] = []
+        self.infos: dict[str, QueueJobInfo] = {}
 
     async def enqueue(self, job_name: str, payload: dict[str, Any], *, job_id: str) -> None:
         if any(existing == job_id for _, _, existing in self.jobs):
             raise DuplicateJobError(job_id)
         self.jobs.append((job_name, payload, job_id))
+
+    async def job_info(self, job_id: str) -> QueueJobInfo:
+        """`infos` overrides; otherwise queued jobs are PENDING and others UNKNOWN."""
+        if job_id in self.infos:
+            return self.infos[job_id]
+        queued = any(existing == job_id for _, _, existing in self.jobs)
+        return QueueJobInfo(state=QueueJobState.PENDING if queued else QueueJobState.UNKNOWN)
 
 
 class FakeBlobStore:
@@ -158,3 +169,12 @@ class FakeJobLog:
         self, job_id: str, *, job_type: str, status: JobStatus, error: str | None = None
     ) -> None:
         self.records.setdefault(job_id, []).append((job_type, status, error))
+
+    async def unfinished(self, *, older_than_s: float) -> list[UnfinishedJob]:
+        """Ignores age (the SQL adapter's age filter has its own integration test)."""
+        open_states = (JobStatus.QUEUED, JobStatus.RUNNING)
+        return [
+            UnfinishedJob(job_id=job_id, job_type=records[-1][0])
+            for job_id, records in self.records.items()
+            if records[-1][1] in open_states
+        ]

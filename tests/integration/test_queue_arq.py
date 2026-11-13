@@ -7,6 +7,7 @@ from arq.jobs import Job, JobStatus
 from housing_netherlands.adapters.queue_arq import ArqJobQueue
 from housing_netherlands.core import ports
 from housing_netherlands.core.errors import DuplicateJobError
+from housing_netherlands.core.models import QueueJobState
 
 
 @pytest.fixture
@@ -54,3 +55,9 @@ async def test_reused_id_of_finished_job_with_kept_result_raises(queue: ArqJobQu
 async def test_reserved_payload_keys_are_rejected(queue: ArqJobQueue) -> None:
     with pytest.raises(ValueError, match="_job_id"):
         await queue.enqueue("import_listing", {"_job_id": "x"}, job_id="job-2")
+
+
+async def test_job_info_pending_and_unknown(queue: ArqJobQueue) -> None:
+    await queue.enqueue("import_listing", {"url": "a"}, job_id="job-q")
+    assert (await queue.job_info("job-q")).state is QueueJobState.PENDING
+    assert (await queue.job_info("never-queued")).state is QueueJobState.UNKNOWN
