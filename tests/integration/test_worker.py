@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from arq.jobs import Job, JobStatus
-from arq.worker import Worker
+from arq.worker import Worker, func
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -19,7 +19,7 @@ from housing_netherlands.core.importing import ImportDeps, request_import
 from housing_netherlands.core.models import FetchedListing, LLMParams
 from housing_netherlands.wiring import build_worker_settings, connect_blob_store
 from housing_netherlands.workers.main import HANDLERS
-from tests.fakes import FakeLLMClient, FakeSourceAdapter
+from tests.fakes import FakeLLMClient, FakeSourceAdapter, HangingLLM
 from tests.test_core_models import make_listing
 
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
@@ -32,7 +32,11 @@ Sessions = async_sessionmaker[AsyncSession]
 
 
 async def run_worker_until_idle(
-    settings: Settings, sessions: Sessions, source: FakeSourceAdapter, llm: FakeLLMClient
+    settings: Settings,
+    sessions: Sessions,
+    source: FakeSourceAdapter,
+    llm: FakeLLMClient,
+    job_timeout_s: float | None = None,
 ) -> None:
     async def startup(state: MutableMapping[str, Any]) -> None:
         stack = AsyncExitStack()
@@ -56,6 +60,11 @@ async def run_worker_until_idle(
         settings, handlers=HANDLERS, on_startup=startup, on_shutdown=shutdown
     )
     config = {k: v for k, v in vars(cls).items() if not k.startswith("__")}
+    if job_timeout_s is not None:  # functions carry their own timeout; rebuild them
+        config["functions"] = [
+            func(f.coroutine, name=f.name, max_tries=f.max_tries, timeout=job_timeout_s)
+            for f in config["functions"]
+        ]
     worker = Worker(**config, burst=True, poll_delay=0.05, handle_signals=False)
     try:
         await worker.main()  # burst: returns once no job is queued or deferred
@@ -146,3 +155,20 @@ async def test_permanent_error_fails_job_and_result_keeps_the_error(
     assert info is not None and not info.success
     assert isinstance(info.result, SourceParseError)  # unpickled with its attributes
     assert info.result.reason == "page has no listing title"
+
+
+async def test_job_timeout_marks_job_failed_not_running_forever(
+    settings: Settings, sessions: Sessions
+) -> None:
+    source = FakeSourceAdapter("huurwoningen", "huurwoningen.nl", FETCHED)
+    job_id = await enqueue(settings, sessions, source)
+    await run_worker_until_idle(settings, sessions, source, HangingLLM(), job_timeout_s=0.5)
+
+    status, error = await job_row(sessions, job_id)
+    assert status == "failed"
+    assert error is not None and "cancelled" in error
+    async with sessions() as s:
+        finished = await s.scalar(
+            text("SELECT finished_at IS NOT NULL FROM jobs_log WHERE id = :id"), {"id": job_id}
+        )
+    assert finished

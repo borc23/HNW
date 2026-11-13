@@ -5,6 +5,7 @@
 deciding whether a failure is worth retrying (`RetryLater`) or final.
 """
 
+import asyncio
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -114,6 +115,8 @@ async def run_import_job(deps: ImportDeps, *, job_id: str, url: str, attempt: in
 
     A retryable fetch failure (network, bot block, 5xx) with attempts left raises `RetryLater`
     and the job goes back to QUEUED; any other error, or the last attempt, is final (FAILED).
+    Cancellation (job timeout, worker shutdown) is recorded as FAILED too, then re-raised; if
+    the queue runs the job again, that attempt moves it back to RUNNING.
     """
     record = deps.job_log.record
     await record(job_id, job_type=IMPORT_LISTING_JOB, status=JobStatus.RUNNING)
@@ -130,14 +133,23 @@ async def run_import_job(deps: ImportDeps, *, job_id: str, url: str, attempt: in
     except Exception as exc:
         await _record_failed(deps, job_id, exc)
         raise
+    except asyncio.CancelledError:
+        # BaseException, so not caught above. Shielded: a second cancel (e.g. shutdown after a
+        # timeout) must not stop the row from leaving RUNNING.
+        await asyncio.shield(
+            _record_failed(deps, job_id, "cancelled (job timeout or worker shutdown)")
+        )
+        raise
     await record(job_id, job_type=IMPORT_LISTING_JOB, status=JobStatus.SUCCEEDED)
     return result
 
 
-async def _record_failed(deps: ImportDeps, job_id: str, exc: Exception) -> None:
+async def _record_failed(deps: ImportDeps, job_id: str, error: Exception | str) -> None:
+    if isinstance(error, Exception):
+        error = f"{type(error).__name__}: {error}"
     await deps.job_log.record(
         job_id,
         job_type=IMPORT_LISTING_JOB,
         status=JobStatus.FAILED,
-        error=f"{type(exc).__name__}: {exc}"[:2000],
+        error=error[:2000],
     )

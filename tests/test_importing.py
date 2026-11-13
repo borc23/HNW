@@ -1,5 +1,6 @@
 """Import use-case and job lifecycle, with in-memory fakes for every port."""
 
+import asyncio
 import json
 from datetime import UTC, datetime
 
@@ -27,6 +28,7 @@ from tests.fakes import (
     FakeListingRepository,
     FakeLLMClient,
     FakeSourceAdapter,
+    HangingLLM,
 )
 from tests.test_core_models import make_listing
 
@@ -225,3 +227,27 @@ def test_raw_blob_key(content_type: str, ext: str) -> None:
     assert raw_blob_key("huurwoningen", "ea81e68d", content_type, at) == (
         f"raw/huurwoningen/ea81e68d/20261113T101500Z.{ext}"
     )
+
+
+# --- cancellation (job timeout / worker shutdown) ------------------------------------------
+
+
+async def test_cancelled_job_is_recorded_failed_and_stays_cancelled() -> None:
+    llm = HangingLLM()
+    deps = ImportDeps(**{**make_deps().__dict__, "llm": llm})
+    task = asyncio.create_task(run_import_job(deps, job_id="job-1", url=URL, attempt=1))
+    await llm.started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert statuses(deps) == [JobStatus.RUNNING, JobStatus.FAILED]
+    assert last_error(deps) == "cancelled (job timeout or worker shutdown)"
+
+
+async def test_timeout_via_wait_for_is_recorded_failed() -> None:
+    # arq runs each job inside asyncio.wait_for(..., job_timeout).
+    deps = ImportDeps(**{**make_deps().__dict__, "llm": HangingLLM()})
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(run_import_job(deps, job_id="job-1", url=URL, attempt=1), 0.05)
+    assert statuses(deps) == [JobStatus.RUNNING, JobStatus.FAILED]

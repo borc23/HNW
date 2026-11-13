@@ -1,5 +1,6 @@
 """In-memory implementations of the core ports, for unit tests."""
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
@@ -59,6 +60,26 @@ class FakeLLMClient:
         self.schemas.append(json_schema)
         self.params.append(params)
         return LLMResponse(text=self.responses.pop(0), model=params.model)
+
+
+class HangingLLM(FakeLLMClient):
+    """An LLM call that never returns (e.g. a slow CPU model) until cancelled; `started` is set
+    once the call is in progress."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+
+    async def complete(
+        self,
+        messages: list[LLMMessage],
+        *,
+        params: LLMParams,
+        json_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        self.started.set()
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
 
 
 class FakeSourceAdapter:
