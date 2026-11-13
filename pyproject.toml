@@ -86,7 +86,8 @@ filterwarnings = [
     "ignore:Using `httpx` with `starlette.testclient` is deprecated",
 ]
 markers = [
-    "integration: needs the Docker Compose stack (postgres, redis, minio); deselect with -m 'not integration'",
+    "integration: needs the Docker Compose stack (postgres, redis, seaweedfs); deselect with -m 'not integration'",
+    "live: calls a real third-party website; skipped unless RUN_LIVE_TESTS=1 (never on CI)",
 ]
 
 [tool.coverage.run]

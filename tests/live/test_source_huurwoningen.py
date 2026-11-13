@@ -1,12 +1,15 @@
 """Against the real huurwoningen.nl: catches markup changes and bot blocks the fixture can't.
 
 Needs internet, not the Compose stack. Two requests: one search page, one listing.
+Opt-in (`RUN_LIVE_TESTS=1 uv run pytest tests/live`): personal use only, never on CI.
 """
 
 import pytest
 from pyhuurwoningen.parsing import parse_search_page
 
 from housing_netherlands.adapters.source_huurwoningen import HuurwoningenSource
+
+pytestmark = pytest.mark.live
 
 
 @pytest.fixture

@@ -74,7 +74,8 @@ uv run pyright                               # type check
 
 Integration tests use separate resources (`housing_test` database, Redis db 15, bucket
 `housing-raw-test`), so they never touch your data. They skip when a service is down, except
-on CI. The live-LLM test runs only when Ollama is reachable.
+on CI. The live-LLM test runs only when Ollama is reachable. Tests against the real
+huurwoningen.nl (`tests/live/`) never run unless you opt in: `RUN_LIVE_TESTS=1 uv run pytest tests/live`.
 
 Layout: `core/` (domain, use-cases, ports; no infrastructure imports), `adapters/` (Postgres,
 Redis/arq, S3, LiteLLM, huurwoningen), `wiring.py` (picks adapters from settings), `api/`,

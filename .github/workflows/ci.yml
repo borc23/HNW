@@ -48,7 +48,8 @@ jobs:
 
   integration:
     # Postgres, Redis and SeaweedFS from docker-compose.yml. No Ollama on CI: the one live-LLM
-    # test skips itself; everything else uses fakes for the LLM and the listing site.
+    # test skips itself; everything else fakes the LLM and the listing site. Tests marked `live`
+    # (real websites) are skipped unless RUN_LIVE_TESTS=1, which CI never sets.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
