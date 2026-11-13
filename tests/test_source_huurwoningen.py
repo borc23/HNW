@@ -1,8 +1,6 @@
 """HuurwoningenSource with a fake HTTP session: URL handling, parsing and error mapping."""
 
 from contextlib import AsyncExitStack
-from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -17,34 +15,10 @@ from housing_netherlands.config import Settings
 from housing_netherlands.core import ports
 from housing_netherlands.core.errors import SourceFetchError, SourceParseError
 from housing_netherlands.wiring import build_sources
+from tests.fakes import HUURWONINGEN_DETAIL_HTML as FIXTURE
+from tests.fakes import FakeSession, respond
 
-FIXTURE = (Path(__file__).parent / "fixtures" / "huurwoningen" / "detail.html").read_bytes()
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
-
-
-class FakeSession:
-    """Records requests and answers each with the next queued response (or exception)."""
-
-    def __init__(self, *responses: Any) -> None:
-        self.responses = list(responses)
-        self.requests: list[tuple[str, float]] = []
-        self.closed = False
-
-    async def get(self, url: str, *, timeout: float) -> Any:  # noqa: ASYNC109  # curl_cffi's API
-        self.requests.append((url, timeout))
-        response = self.responses.pop(0)
-        if isinstance(response, Exception):
-            raise response
-        return response
-
-    async def close(self) -> None:
-        self.closed = True
-
-
-def respond(
-    status: int = 200, content: bytes = FIXTURE, headers: dict[str, str] | None = None
-) -> SimpleNamespace:
-    return SimpleNamespace(status_code=status, content=content, headers=headers or {})
 
 
 def make_source(*responses: Any) -> tuple[HuurwoningenSource, FakeSession]:

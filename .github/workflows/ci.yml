@@ -65,10 +65,10 @@ jobs:
         run: uv sync --locked
 
       - name: Start services
+        # The tests create their own buckets/databases (see tests/integration/conftest.py).
         run: |
           cp .env.example .env
           docker compose up -d --build --wait postgres redis seaweedfs
-          docker compose up --exit-code-from seaweedfs-init seaweedfs-init
 
       - name: Integration tests
         # CI=true (set by GitHub) makes a missing service fail the run instead of skipping.

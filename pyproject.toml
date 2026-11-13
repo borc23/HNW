@@ -37,7 +37,7 @@ build-backend = "uv_build"
 dev = [
     "notebook>=7.6.5",
     "pre-commit>=4.7.0",
-    "pyright==1.1.408",
+    "pyright[nodejs]==1.1.408",
     "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=7.1.0",

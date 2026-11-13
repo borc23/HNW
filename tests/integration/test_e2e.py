@@ -5,38 +5,21 @@ two outside services: the site's HTTP response is a saved page and the LLM is a 
 """
 
 import json
-from collections.abc import Iterator
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from housing_netherlands.adapters.source_huurwoningen import HuurwoningenSource
-from housing_netherlands.api.app import create_app
 from housing_netherlands.config import Settings
-from housing_netherlands.wiring import build_adapters, connect_blob_store
-from tests.fakes import FakeLLMClient
-from tests.integration.test_worker import run_worker_until_idle
+from housing_netherlands.wiring import connect_blob_store
+from tests.fakes import HUURWONINGEN_DETAIL_HTML as FIXTURE
+from tests.fakes import FakeLLMClient, FakeSession, respond
+from tests.integration.worker_runner import Sessions, run_worker_until_idle
 from tests.redirects import redirected_job_id
-from tests.test_source_huurwoningen import FIXTURE, FakeSession, respond
 
 PASTED_URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/?utm_source=mail"
 CANONICAL_URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
 SUMMARY = {"summary_en": "Bright 3-room flat.", "key_facts": ["EUR 1450", "72 m2", "3 rooms"]}
-
-Sessions = async_sessionmaker[AsyncSession]
-
-
-@pytest.fixture
-def settings(s3_settings: Settings, redis_test_url: str) -> Settings:
-    return s3_settings
-
-
-@pytest.fixture
-def client(settings: Settings, sessions: Sessions) -> Iterator[TestClient]:
-    with TestClient(create_app(lambda: build_adapters(settings))) as c:
-        yield c
 
 
 def site(*responses: object) -> HuurwoningenSource:

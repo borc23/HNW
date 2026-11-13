@@ -67,7 +67,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.12.
 uv sync
 uv run pre-commit install
 uv run pytest -m "not integration"           # unit tests, no services needed
-docker compose up -d --wait postgres redis seaweedfs seaweedfs-init
+docker compose up -d --wait postgres redis seaweedfs
 uv run pytest                                # everything, incl. the end-to-end test
 uv run pyright                               # type check
 ```

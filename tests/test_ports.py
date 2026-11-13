@@ -10,8 +10,8 @@ from tests.fakes import (
     FakeListingRepository,
     FakeLLMClient,
     FakeSourceAdapter,
+    make_listing,
 )
-from tests.test_core_models import make_listing
 
 
 @pytest.mark.parametrize(

@@ -10,8 +10,7 @@ from housing_netherlands.core.summarize import (
     content_hash,
     summarize,
 )
-from tests.fakes import FakeLLMClient
-from tests.test_core_models import make_listing
+from tests.fakes import FakeLLMClient, make_listing
 
 PARAMS = LLMParams(model="ollama_chat/qwen3.5:4b", reasoning_effort="none")
 VALID = json.dumps(

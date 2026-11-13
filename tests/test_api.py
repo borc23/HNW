@@ -16,9 +16,9 @@ from tests.fakes import (
     FakeListingRepository,
     FakeLLMClient,
     FakeSourceAdapter,
+    make_listing,
 )
 from tests.redirects import redirected_job_id
-from tests.test_core_models import make_listing
 
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
 

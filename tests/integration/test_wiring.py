@@ -7,7 +7,7 @@ from housing_netherlands.config import Settings
 from housing_netherlands.core import ports
 from housing_netherlands.core.models import JobStatus
 from housing_netherlands.wiring import build_adapters, connect_blob_store
-from tests.test_core_models import make_listing
+from tests.fakes import make_listing
 
 
 async def test_build_adapters_writes_only_to_test_resources(

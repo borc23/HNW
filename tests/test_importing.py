@@ -36,8 +36,8 @@ from tests.fakes import (
     FakeSourceAdapter,
     HangingLLM,
     UnavailableLLM,
+    make_listing,
 )
-from tests.test_core_models import make_listing
 
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
 SUMMARY = json.dumps({"summary_en": "Bright flat.", "key_facts": ["EUR 915", "50 m2", "balcony"]})

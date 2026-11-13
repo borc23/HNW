@@ -1,20 +1,22 @@
 import asyncio
 import os
 import socket
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import NoReturn
 
 import pytest
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from redis.asyncio import Redis
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
 from housing_netherlands.adapters.db import create_engine, create_session_factory
+from housing_netherlands.api.app import create_app
 from housing_netherlands.config import Settings
-from housing_netherlands.wiring import connect_blob_store
+from housing_netherlands.wiring import build_adapters, connect_blob_store
 from tests.isolation import to_test_settings
 from tests.service_probe import tcp_target
 
@@ -129,3 +131,16 @@ async def sessions(
         await conn.execute(text(f"TRUNCATE {TABLES} RESTART IDENTITY CASCADE"))
     yield create_session_factory(engine)
     await engine.dispose()
+
+
+@pytest.fixture
+def settings(s3_settings: Settings, redis_test_url: str) -> Settings:
+    """Settings for app-level tests: every test resource ready, retry policy pinned (not .env)."""
+    return s3_settings.model_copy(update={"import_max_attempts": 3})
+
+
+@pytest.fixture
+def client(settings: Settings, sessions: async_sessionmaker[AsyncSession]) -> Iterator[TestClient]:
+    """The real app, built by `wiring.build_adapters` on the test resources (lifespan included)."""
+    with TestClient(create_app(lambda: build_adapters(settings))) as c:
+        yield c
