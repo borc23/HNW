@@ -1,6 +1,9 @@
 """A real arq worker (burst mode) on the test Redis/Postgres/S3, with a fake source and LLM."""
 
+import asyncio
+import contextlib
 import json
+import signal
 from collections.abc import MutableMapping
 from contextlib import AsyncExitStack
 from typing import Any
@@ -31,13 +34,15 @@ FETCHED = FetchedListing(
 Sessions = async_sessionmaker[AsyncSession]
 
 
-async def run_worker_until_idle(
+def make_worker(
     settings: Settings,
     sessions: Sessions,
     source: FakeSourceAdapter,
     llm: FakeLLMClient,
     job_timeout_s: float | None = None,
-) -> None:
+    *,
+    burst: bool = True,
+) -> Worker:
     async def startup(state: MutableMapping[str, Any]) -> None:
         stack = AsyncExitStack()
         blobs = await connect_blob_store(settings)
@@ -50,6 +55,7 @@ async def run_worker_until_idle(
             llm=llm,
             sources=[source],
             llm_params=LLMParams(model="fake-model"),
+            max_attempts=settings.import_max_attempts,
             retry_base_delay_s=0.05,
         )
 
@@ -65,7 +71,17 @@ async def run_worker_until_idle(
             func(f.coroutine, name=f.name, max_tries=f.max_tries, timeout=job_timeout_s)
             for f in config["functions"]
         ]
-    worker = Worker(**config, burst=True, poll_delay=0.05, handle_signals=False)
+    return Worker(**config, burst=burst, poll_delay=0.05, handle_signals=False)
+
+
+async def run_worker_until_idle(
+    settings: Settings,
+    sessions: Sessions,
+    source: FakeSourceAdapter,
+    llm: FakeLLMClient,
+    job_timeout_s: float | None = None,
+) -> None:
+    worker = make_worker(settings, sessions, source, llm, job_timeout_s)
     try:
         await worker.main()  # burst: returns once no job is queued or deferred
     finally:
@@ -172,3 +188,31 @@ async def test_job_timeout_marks_job_failed_not_running_forever(
             text("SELECT finished_at IS NOT NULL FROM jobs_log WHERE id = :id"), {"id": job_id}
         )
     assert finished
+
+
+async def test_job_interrupted_by_shutdown_on_its_last_attempt_still_completes(
+    settings: Settings, sessions: Sessions
+) -> None:
+    # Worst case for the attempt budget: the import may only be tried once.
+    settings = settings.model_copy(update={"import_max_attempts": 1})
+    source = FakeSourceAdapter("huurwoningen", "huurwoningen.nl", FETCHED)
+    job_id = await enqueue(settings, sessions, source)
+
+    hanging = HangingLLM()
+    first = make_worker(settings, sessions, source, hanging, burst=False)
+    running = asyncio.create_task(first.main())
+    await asyncio.wait_for(hanging.started.wait(), 10)
+    # Redeploy: arq cancels the job and re-queues it, then the process exits. (handle_sig only
+    # stops arq's own main task, which `main()` doesn't use, so stop the poll loop too.)
+    first.handle_sig(signal.SIGTERM)
+    running.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await asyncio.wait_for(running, 10)
+    await first.close()
+    # The interrupted attempt's FAILED write is shielded but may still be in flight (or cut off
+    # by process exit), so don't assert it here; what matters is that the job gets finished.
+
+    await run_worker_until_idle(settings, sessions, source, FakeLLMClient(SUMMARY))
+
+    assert source.fetched_urls == [URL, URL]  # the restarted worker ran the job again
+    assert await job_row(sessions, job_id) == ("succeeded", None)

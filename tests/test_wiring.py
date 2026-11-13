@@ -132,3 +132,11 @@ async def test_unknown_queue_backend_fails_clearly_and_releases_engine(fakes: Fa
         async with wiring.build_adapters(settings):
             pytest.fail("should not start")
     assert fakes.engine.disposed
+
+
+def test_queue_allows_more_tries_than_the_handler_for_restarts() -> None:
+    async def noop(state: object) -> None: ...
+
+    settings = Settings().model_copy(update={"import_max_attempts": 3})
+    cls = wiring.build_worker_settings(settings, handlers={}, on_startup=noop, on_shutdown=noop)
+    assert cls.max_tries == 3 + wiring.INTERRUPTED_RUN_ALLOWANCE  # type: ignore[attr-defined]

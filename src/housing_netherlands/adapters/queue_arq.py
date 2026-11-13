@@ -61,8 +61,9 @@ def worker_settings(
 ) -> type:
     """arq `WorkerSettings` (run with `arq <module>.WorkerSettings`) for queue-independent handlers.
 
-    `max_tries` must be >= the handlers' own attempt limit, so arq never drops a job that the
-    handler still wants retried; the handler decides when to stop.
+    `max_tries` must exceed the handlers' own attempt limit with headroom: arq also counts runs
+    cancelled by a worker restart as tries, and once over `max_tries` it fails the job without
+    calling the handler. The handler decides when a job is finished.
     """
 
     async def startup(ctx: MutableMapping[str, Any]) -> None:

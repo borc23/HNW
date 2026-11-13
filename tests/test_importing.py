@@ -251,3 +251,16 @@ async def test_timeout_via_wait_for_is_recorded_failed() -> None:
     with pytest.raises(TimeoutError):
         await asyncio.wait_for(run_import_job(deps, job_id="job-1", url=URL, attempt=1), 0.05)
     assert statuses(deps) == [JobStatus.RUNNING, JobStatus.FAILED]
+
+
+async def test_run_past_max_attempts_still_finishes_the_job() -> None:
+    # A restart can make the queue run attempt 4 of 3: the handler must still finalise it.
+    error = SourceFetchError("huurwoningen", URL, "HTTP 503", status=503)
+    deps = make_deps(outcomes=[error])
+    with pytest.raises(SourceFetchError):
+        await run_import_job(deps, job_id="job-1", url=URL, attempt=4)
+    assert statuses(deps) == [JobStatus.RUNNING, JobStatus.FAILED]
+
+    ok = make_deps(SUMMARY)
+    await run_import_job(ok, job_id="job-2", url=URL, attempt=4)
+    assert statuses(ok, "job-2") == [JobStatus.RUNNING, JobStatus.SUCCEEDED]

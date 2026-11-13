@@ -116,7 +116,9 @@ async def run_import_job(deps: ImportDeps, *, job_id: str, url: str, attempt: in
     A retryable fetch failure (network, bot block, 5xx) with attempts left raises `RetryLater`
     and the job goes back to QUEUED; any other error, or the last attempt, is final (FAILED).
     Cancellation (job timeout, worker shutdown) is recorded as FAILED too, then re-raised; if
-    the queue runs the job again, that attempt moves it back to RUNNING.
+    the queue runs the job again, that attempt moves it back to RUNNING. `attempt` counts every
+    run, including interrupted ones, so a run past `max_attempts` (the queue allows headroom
+    for restarts) still finishes the job: success, or FAILED on any error.
     """
     record = deps.job_log.record
     await record(job_id, job_type=IMPORT_LISTING_JOB, status=JobStatus.RUNNING)

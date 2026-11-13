@@ -136,6 +136,13 @@ def import_deps(adapters: Adapters, settings: Settings) -> ImportDeps:
     )
 
 
+# Extra queue-level tries beyond IMPORT_MAX_ATTEMPTS, for runs interrupted by a worker restart
+# (arq re-queues a cancelled job and counts it as a try). Without headroom, a restart during
+# the last attempt makes arq drop the job without calling the handler. The handler stays the
+# one that decides when a job is finished (see run_import_job).
+INTERRUPTED_RUN_ALLOWANCE = 3
+
+
 def build_worker_settings(
     settings: Settings,
     *,
@@ -153,7 +160,7 @@ def build_worker_settings(
                 handlers=handlers,
                 on_startup=on_startup,
                 on_shutdown=on_shutdown,
-                max_tries=settings.import_max_attempts,
+                max_tries=settings.import_max_attempts + INTERRUPTED_RUN_ALLOWANCE,
                 job_timeout_s=job_timeout_s,
             )
         case _:
