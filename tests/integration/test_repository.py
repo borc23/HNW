@@ -24,7 +24,12 @@ def test_adapters_implement_ports(sessions: Sessions) -> None:
 
 
 async def test_upsert_creates_listing_with_property_and_point(repo: SqlListingRepository) -> None:
-    listing = make_listing(address_text="Zuidplein 1, Rotterdam", description="Mooi.")
+    listing = make_listing(
+        address_text="Zuidplein 1, Rotterdam",
+        description="Mooi.",
+        neighbourhood="Zuidplein",
+        image_url="https://example.org/photo.jpg",
+    )
     listing_id = await repo.upsert_listing(listing, raw_blob_key="raw/1.json")
 
     [view] = await repo.list_listings()

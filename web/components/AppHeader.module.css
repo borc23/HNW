@@ -1,0 +1,75 @@
+.bar {
+  position: sticky;
+  top: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  width: min(var(--content), 100% - 2 * var(--gutter));
+  margin: 12px auto 0;
+  padding: 8px;
+  border: 1px solid var(--bar-edge);
+  border-radius: var(--radius-card);
+  background: var(--bar-glass);
+  box-shadow: var(--shadow-bar);
+}
+
+/* Frosted only where the browser can blur; otherwise a solid bar. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .bar {
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bar {
+    background: var(--surface);
+  }
+}
+
+.brand {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 8px 0 4px;
+  border-radius: var(--radius-inner);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--ground);
+}
+
+/* Phone: float above the home indicator, brand shrinks to its mark. */
+@media (max-width: 640px) {
+  .bar {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
+    margin: 0;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .brand {
+    padding: 0 2px;
+  }
+
+  .name {
+    display: none;
+  }
+}

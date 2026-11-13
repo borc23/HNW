@@ -23,7 +23,8 @@ reference.
 A couple in Rotterdam looking for a rental home together. Neither reads Dutch comfortably: the
 interface is English, and Dutch listing text has to be summarised, translated and explained.
 They care about what they can afford on their incomes, the commute to both of their jobs, and
-must-haves. In the Rotterdam market good flats go within hours, so the job is to spot a fitting
+must-haves. Both partners use it, and one of them weighs how attractive it is heavily: the app has
+to be a pleasure to browse, with listings that look inviting, not just a data tool. In the Rotterdam market good flats go within hours, so the job is to spot a fitting
 listing quickly, trust the judgement, and contact the landlord before others do.
 
 Later (roadmap step 8) outside paying users may sign up; they are not designed for yet.
@@ -92,8 +93,10 @@ Working name "NL Housing". No logo, voice guide or brand assets yet. The earlier
   listings are described in `docs/home-design-v1/DESIGN.md` (Zuidplein €915, Groenendaal €1,207,
   Hanoistraat €1,432). The fit and commute values there are placeholders.
 - Fixture page: `tests/fixtures/huurwoningen/detail.html`.
+- Listing photos: the source library (`pyhuurwoningen`) parses each listing's main photo
+  (`image_url`), but the `Listing` model does not store it yet.
 - None yet: fit scores, commute times, neighbourhood stats, red flags, rent-fairness figures,
-  listing photos in the API, user profile data. Do not fabricate these as if real; mark sample
+  user profile data. Do not fabricate these as if real; mark sample
   values as placeholders.
 
 ## Product Principles

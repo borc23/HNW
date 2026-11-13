@@ -1,0 +1,120 @@
+.box {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-inner);
+  background: var(--bar-field);
+  color: var(--ink);
+  font: inherit;
+  transition: border-color 160ms ease-out, background-color 160ms ease-out;
+}
+
+.input::placeholder {
+  color: var(--ink-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--action);
+  background: var(--surface);
+}
+
+.button {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: var(--action);
+  color: var(--action-ink);
+  font: 800 var(--text-md) / 1 var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms ease-out, transform 280ms var(--spring);
+}
+
+.button:hover {
+  background: var(--action-hover);
+}
+
+.button:active {
+  transform: scale(0.96);
+}
+
+/* Not pressable: loses the action colour entirely. */
+.button:disabled {
+  background: var(--line);
+  color: var(--ink-muted);
+  cursor: progress;
+  transform: none;
+}
+
+.live:empty {
+  display: none;
+}
+
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.status > span {
+  display: flex;
+  padding-top: 1px;
+}
+
+.working {
+  background: var(--bar-field);
+  color: var(--ink);
+}
+
+.ok {
+  background: var(--ok-tint);
+  color: var(--ok);
+}
+
+.problem {
+  background: var(--problem-tint);
+  color: var(--problem);
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* Phone: the bar sits at the bottom, so its status message rises above the field. */
+@media (max-width: 640px) {
+  .box {
+    flex-direction: column-reverse;
+  }
+
+  .button {
+    padding: 0 16px;
+  }
+}

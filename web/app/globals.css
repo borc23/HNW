@@ -1,0 +1,103 @@
+/* Design tokens: the only place colours, radii and type sizes are defined. */
+:root {
+  --ground: #f6efe8;
+  --surface: #ffffff;
+  --surface-sunk: #f1e7dd;
+  --ink: #2a2420;
+  --ink-muted: #6b5f57;
+  --line: #e8dccf;
+
+  /* The action colour appears only on things you can press. */
+  --action: #d4401c;
+  --action-hover: #b8350f;
+  --action-ink: #ffffff;
+
+  --ok: #24693f;
+  --ok-tint: #e3f1e6;
+  --problem: #a8261b;
+  --problem-tint: #fbe6e2;
+
+  --font: var(--font-nunito), ui-rounded, system-ui, sans-serif;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.5rem;
+  --text-2xl: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+
+  --radius-card: 24px;
+  --radius-inner: 16px;
+  --shadow-card: 0 1px 2px rgb(42 36 32 / 0.05), 0 10px 28px -12px rgb(42 36 32 / 0.16);
+  --shadow-card-hover: 0 1px 2px rgb(42 36 32 / 0.05), 0 18px 36px -14px rgb(42 36 32 / 0.24);
+
+  --gutter: clamp(16px, 4vw, 40px);
+  --content: 1160px;
+  --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scrollbar-color: var(--line) var(--ground);
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 var(--text-md) / 1.5 var(--font);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  caret-color: var(--action);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+::selection {
+  background: #f6c6b6;
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--action);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

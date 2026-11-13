@@ -1,0 +1,128 @@
+.card {
+  height: 100%; /* fill the grid row so every footer lines up */
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition: transform 320ms var(--spring), box-shadow 200ms ease-out;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* The signature press: a soft spring, never a bounce on entry. */
+.card:active {
+  transform: scale(0.98);
+}
+
+.link {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px;
+  border-radius: var(--radius-card);
+  text-decoration: none;
+}
+
+.photo {
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-inner);
+  overflow: hidden;
+  background: var(--surface-sunk);
+}
+
+.photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.noPhoto {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 14px 8px 6px;
+}
+
+.title {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.place {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.note,
+.pending {
+  margin-top: 10px;
+}
+
+.pending {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.facts {
+  margin-top: 10px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.rent {
+  font-size: var(--text-xl);
+  font-weight: 800;
+}
+
+.rent span {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--action);
+  color: var(--action-ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  transition: background-color 160ms ease-out;
+}
+
+.link:hover .cta {
+  background: var(--action-hover);
+}

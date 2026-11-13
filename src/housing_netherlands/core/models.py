@@ -59,9 +59,11 @@ class Listing(BaseModel):
     address_text: str | None = None
     postcode: str | None = None
     city: str | None = None
+    neighbourhood: str | None = None
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     description: str | None = None
+    image_url: str | None = None  # the source's main photo, hotlinked (not archived)
 
 
 class FetchedListing(BaseModel):

@@ -30,7 +30,9 @@ _LISTING_FIELDS = (
     "bedrooms",
     "postcode",
     "city",
+    "neighbourhood",
     "description",
+    "image_url",
 )
 
 

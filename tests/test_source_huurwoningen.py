@@ -5,11 +5,13 @@ from typing import Any
 
 import pytest
 from curl_cffi.requests.exceptions import Timeout
+from pyhuurwoningen.models import ListingDetails
 
 from housing_netherlands.adapters.source_huurwoningen import (
     HuurwoningenSource,
     canonical_url,
     check_impersonate,
+    to_listing,
 )
 from housing_netherlands.config import Settings
 from housing_netherlands.core import ports
@@ -81,8 +83,14 @@ async def test_fetch_parses_listing_and_keeps_raw_page() -> None:
     assert (listing.price_eur, listing.area_m2, listing.rooms, listing.bedrooms) == (1450, 72, 3, 2)
     assert listing.address_text == "Voorbeeldstraat, 3083CR Rotterdam"
     assert (listing.postcode, listing.city) == ("3083CR", "Rotterdam")
+    assert listing.neighbourhood == "Zuidplein"
     assert (listing.latitude, listing.longitude) == (51.8871, 4.4887)
     assert listing.description is not None and listing.description.startswith("Licht 3-kamer")
+
+
+def test_main_photo_is_kept() -> None:
+    details = ListingDetails(id="x", url=URL, title="T", image_url="https://cdn.example/1.jpg")
+    assert to_listing(details, URL).image_url == "https://cdn.example/1.jpg"
 
 
 async def test_missing_content_type_defaults_to_html() -> None:
