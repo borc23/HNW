@@ -2,9 +2,11 @@
 
 Personal housing dashboard for the Dutch rental market: collects, enriches and ranks listings.
 
-Step 1 (walking skeleton): paste a huurwoningen.nl listing URL, a background worker fetches and
-parses it, archives the raw page, stores the listing and adds an English AI summary with three
-key facts. Scraped sources are for personal use only.
+The worker keeps every huurwoningen.nl listing in Rotterdam in step: every 15 minutes it reads
+the site's sitemap, imports new and changed listings (raw page archived, listing parsed and
+stored) and hides listings that are no longer offered. English AI summaries with three key
+facts are written in the background, one at a time, newest first. You can still import a single
+listing by URL (it is summarised straight away). Scraped sources are for personal use only.
 
 ## Run it
 
@@ -26,7 +28,7 @@ second).
 | Service | What it does |
 |---|---|
 | `api` | FastAPI on `localhost:8000`: the page and the JSON API |
-| `worker` | arq worker: imports listings; sweeps stuck jobs every minute |
+| `worker` | arq worker: imports listings; syncs Rotterdam every 15 min; writes summaries in the background; sweeps stuck jobs every minute |
 | `migrate` | one-shot `alembic upgrade head` before `api` and `worker` start |
 | `postgres` `redis` `seaweedfs` `ollama` | database (PostGIS + pgvector), queue, S3 raw pages, LLM |
 
@@ -69,6 +71,10 @@ All settings are environment variables (`.env`); see `.env.example`. Common ones
 | `SOURCES_ENABLED` | `huurwoningen` | Comma-separated |
 | `HUURWONINGEN_IMPERSONATE` | `chrome` | Browser profile for the site's bot check; checked at startup |
 | `IMPORT_MAX_ATTEMPTS` | `3` | Temporary failures (site down, LLM unreachable) retry after 30 s, 60 s |
+| `SYNC_CITY` | `rotterdam` | City to mirror; empty turns the scheduled sync off |
+| `SYNC_EVERY_MIN` | `15` | Minutes between syncs (one sitemap request each) |
+| `HUURWONINGEN_MIN_INTERVAL_S` | `2` | Seconds between requests to the site; a full backfill (~1,500 pages) takes about an hour |
+| `SUMMARY_BATCH_S` | `240` | Seconds of LLM work per background run; about one summary a minute on CPU |
 
 ## Development
 

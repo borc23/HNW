@@ -73,11 +73,17 @@ def fakes(monkeypatch: pytest.MonkeyPatch) -> Fakes:
 
 
 async def test_everything_closed_on_normal_exit(fakes: Fakes) -> None:
-    settings = Settings(huurwoningen_timeout_s=5, huurwoningen_impersonate="safari")
+    settings = Settings(
+        huurwoningen_timeout_s=5, huurwoningen_impersonate="safari", huurwoningen_min_interval_s=1
+    )
     async with wiring.build_adapters(settings) as adapters:
         assert adapters.blobs is fakes.blobs
         assert adapters.sources == tuple(fakes.sources)
-        assert fakes.sources[0].kwargs == {"timeout_s": 5, "impersonate": "safari"}
+        assert fakes.sources[0].kwargs == {
+            "timeout_s": 5,
+            "impersonate": "safari",
+            "min_interval_s": 1,
+        }
     assert fakes.blobs.closed and fakes.queue.closed and fakes.engine.disposed
     assert fakes.sources[0].closed
 

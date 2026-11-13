@@ -1,6 +1,7 @@
 import json
 
 import pytest
+import structlog
 
 from housing_netherlands.log import (
     bind_context,
@@ -16,6 +17,9 @@ def _clean_context():
     clear_context()
     yield
     clear_context()
+    # configure_logging binds the current sys.stdout, here pytest's capture stream, which is
+    # closed after the test; later tests that log a warning would write to it.
+    structlog.reset_defaults()
 
 
 def _last_json_line(out: str) -> dict:

@@ -1,6 +1,7 @@
 """In-memory implementations of the core ports, for unit tests."""
 
 import asyncio
+from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ from housing_netherlands.core.models import (
     FetchedListing,
     JobRecord,
     JobStatus,
+    KnownListing,
     Listing,
     ListingFilters,
     ListingSummary,
@@ -168,11 +170,14 @@ class FakeListingRepository:
         self.listings: dict[tuple[str, str], tuple[int, Listing, str]] = {}
         self.enrichments: dict[tuple[int, str, str], tuple[str, ListingSummary]] = {}
         self.last_filters: ListingFilters | None = None
+        self.removed: set[int] = set()
+        self.summary_pending: set[int] = set()
 
     async def upsert_listing(self, listing: Listing, *, raw_blob_key: str) -> int:
         key = (listing.source, listing.url)
         listing_id = self.listings[key][0] if key in self.listings else len(self.listings) + 1
         self.listings[key] = (listing_id, listing, raw_blob_key)
+        self.removed.discard(listing_id)
         return listing_id
 
     async def find_enrichment(
@@ -191,12 +196,45 @@ class FakeListingRepository:
         output: ListingSummary,
     ) -> None:
         self.enrichments[(listing_id, prompt_version, content_hash)] = (model, output)
+        self.summary_pending.discard(listing_id)
+
+    async def get_view(self, listing_id: int) -> ListingView | None:
+        return next((v for v in self._views() if v.id == listing_id), None)
+
+    async def known_listings(self, source: str) -> dict[str, KnownListing]:
+        now = datetime.now(UTC)
+        return {
+            item.source_listing_id: KnownListing(url=item.url, last_fetched=now)
+            for lid, item, _ in self.listings.values()
+            if item.source == source and lid not in self.removed
+        }
+
+    async def mark_removed(self, source: str, urls: Collection[str]) -> int:
+        hits = {
+            lid
+            for lid, item, _ in self.listings.values()
+            if item.source == source and item.url in urls
+        } - self.removed
+        self.removed |= hits
+        return len(hits)
+
+    async def mark_summary_pending(self, listing_id: int) -> None:
+        self.summary_pending.add(listing_id)
+
+    async def clear_summary_pending(self, listing_id: int) -> None:
+        self.summary_pending.discard(listing_id)
+
+    async def pending_summaries(self, *, limit: int) -> list[int]:
+        return sorted(self.summary_pending - self.removed, reverse=True)[:limit]
 
     async def list_listings(
         self, filters: ListingFilters | None = None, *, limit: int = 50
     ) -> list[ListingView]:
         # Filtering itself is tested against Postgres; the fake only records what was asked.
         self.last_filters = filters
+        return [v for v in self._views() if v.id not in self.removed][:limit]
+
+    def _views(self) -> list[ListingView]:
         now = datetime.now(UTC)
         summaries = {lid: out for (lid, _, _), (_, out) in self.enrichments.items()}
         return [
@@ -204,7 +242,7 @@ class FakeListingRepository:
                 id=lid, listing=listing, first_seen=now, last_seen=now, summary=summaries.get(lid)
             )
             for lid, listing, _ in self.listings.values()
-        ][:limit]
+        ]
 
     async def list_places(self, *, limit: int = 100) -> list[str]:
         names = {

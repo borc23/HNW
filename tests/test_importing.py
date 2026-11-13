@@ -18,6 +18,7 @@ from housing_netherlands.core.errors import (
 from housing_netherlands.core.importing import (
     IMPORT_LISTING_JOB,
     ImportDeps,
+    import_listing,
     raw_blob_key,
     request_import,
     run_import_job,
@@ -76,7 +77,7 @@ async def test_request_import_logs_queued_then_enqueues() -> None:
     sources = [FakeSourceAdapter("huurwoningen", "huurwoningen.nl")]
     job_id = await request_import(queue, log, sources, URL)
 
-    assert queue.jobs == [(IMPORT_LISTING_JOB, {"url": URL}, job_id)]
+    assert queue.jobs == [(IMPORT_LISTING_JOB, {"url": URL, "summarize_now": True}, job_id)]
     assert log.records[job_id] == [(IMPORT_LISTING_JOB, JobStatus.QUEUED, None)]
 
 
@@ -299,3 +300,40 @@ async def test_llm_unavailable_on_last_attempt_fails() -> None:
     with pytest.raises(LLMUnavailableError):
         await run_import_job(deps, job_id="job-1", url=URL, attempt=3)
     assert statuses(deps) == [JobStatus.RUNNING, JobStatus.FAILED]
+
+
+# --- summaries left to the background task --------------------------------------------------
+
+
+async def test_bulk_import_flags_the_summary_instead_of_calling_the_llm() -> None:
+    deps = make_deps()  # no LLM replies queued: a call would fail
+    result = await import_listing(deps, URL, summarize_now=False)
+    assert result.summary_cached is False
+    assert await deps.listings.pending_summaries(limit=5) == [result.listing_id]
+    assert deps.llm.calls == []  # type: ignore[attr-defined]
+
+
+async def test_cached_summary_clears_a_pending_flag() -> None:
+    deps = make_deps(SUMMARY)
+    first = await import_listing(deps, URL)  # summarised inline
+    await deps.listings.mark_summary_pending(first.listing_id)
+    again = await import_listing(deps, URL, summarize_now=False)
+    assert again.summary_cached is True
+    assert await deps.listings.pending_summaries(limit=5) == []
+
+
+@pytest.mark.parametrize(
+    ("error", "hidden"),
+    [
+        (SourceFetchError("huurwoningen", URL, "HTTP 404", status=404), True),
+        (SourceFetchError("huurwoningen", URL, "HTTP 410", status=410), True),
+        (SourceFetchError("huurwoningen", URL, "HTTP 503", status=503), False),
+        (SourceParseError("huurwoningen", URL, "page has no listing title"), False),
+    ],
+)
+async def test_only_a_gone_page_hides_the_listing(error: Exception, hidden: bool) -> None:
+    deps = make_deps(SUMMARY, outcomes=[FETCHED, error])
+    await import_listing(deps, URL)  # stored
+    with pytest.raises(type(error)):
+        await import_listing(deps, URL)
+    assert (await deps.listings.list_listings() == []) is hidden

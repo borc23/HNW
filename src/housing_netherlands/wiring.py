@@ -14,7 +14,7 @@ from housing_netherlands.adapters.queue_arq import ArqJobQueue, worker_settings
 from housing_netherlands.adapters.source_huurwoningen import HuurwoningenSource
 from housing_netherlands.config import Settings
 from housing_netherlands.core.importing import ImportDeps
-from housing_netherlands.core.jobs import JobHandler, Lifecycle, PeriodicTask
+from housing_netherlands.core.jobs import JobHandler, Lifecycle, Periodic
 from housing_netherlands.core.models import LLMParams
 from housing_netherlands.core.ports import (
     BlobStore,
@@ -48,6 +48,7 @@ def build_sources(settings: Settings, stack: AsyncExitStack) -> tuple[SourceAdap
                 source = HuurwoningenSource(
                     timeout_s=settings.huurwoningen_timeout_s,
                     impersonate=settings.huurwoningen_impersonate,
+                    min_interval_s=settings.huurwoningen_min_interval_s,
                 )
                 stack.push_async_callback(source.close)
                 sources.append(source)
@@ -149,7 +150,7 @@ def build_worker_settings(
     handlers: dict[str, JobHandler],
     on_startup: Lifecycle,
     on_shutdown: Lifecycle,
-    periodic: dict[str, PeriodicTask] | None = None,
+    periodic: dict[str, Periodic] | None = None,
 ) -> type:
     """The queue backend's worker runner for these handlers."""
     # Upper bound for one attempt: fetch + archive + LLM call and its one retry, plus margin.

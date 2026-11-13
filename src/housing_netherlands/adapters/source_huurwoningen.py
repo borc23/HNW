@@ -4,6 +4,9 @@ Fetching uses curl_cffi with a browser's network fingerprint, because the site a
 clients with 403. Parsing is pyhuurwoningen's, so markup changes are fixed in that one library.
 """
 
+import asyncio
+import time
+from datetime import UTC
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -12,10 +15,17 @@ from curl_cffi.requests.exceptions import RequestException
 from curl_cffi.requests.impersonate import resolve_latest_browser_type
 from pydantic import ValidationError
 from pyhuurwoningen.models import ListingDetails
-from pyhuurwoningen.parsing import BASE_URL, DETAIL_PATH, parse_detail_page
+from pyhuurwoningen.parsing import (
+    BASE_URL,
+    DETAIL_PATH,
+    SITEMAP_PATH,
+    city_slug,
+    parse_detail_page,
+    parse_sitemap,
+)
 
 from housing_netherlands.core.errors import SourceFetchError, SourceParseError
-from housing_netherlands.core.models import FetchedListing, Interior, Listing
+from housing_netherlands.core.models import FetchedListing, IndexEntry, Interior, Listing
 
 NAME = "huurwoningen"
 HOSTS = frozenset({"www.huurwoningen.nl", "huurwoningen.nl"})
@@ -80,6 +90,7 @@ def to_listing(details: ListingDetails, url: str) -> Listing:
         build_year=_plausible_year(details.build_year),
         new_build=_lookup(_CONSTRUCTION, details.construction_type),
         interior=_lookup(_INTERIORS, details.interior),
+        offered_since=details.offered_since,
     )
 
 
@@ -104,7 +115,8 @@ class HuurwoningenSource:
     """Holds one HTTP session (connection reuse); release it with `await source.close()`.
 
     No retries here: a failed fetch raises `SourceFetchError` and the job queue decides
-    whether to retry (`SourceFetchError.retryable`).
+    whether to retry (`SourceFetchError.retryable`). Requests from one process are spaced at
+    least `min_interval_s` apart, however many jobs run at once, to stay low-volume.
     """
 
     name = NAME
@@ -114,9 +126,13 @@ class HuurwoningenSource:
         *,
         timeout_s: float,
         impersonate: str = "chrome",
+        min_interval_s: float = 0.0,
         session: Any = None,  # an AsyncSession-like object; tests pass a fake
     ) -> None:
         self._timeout_s = timeout_s
+        self._min_interval_s = min_interval_s
+        self._pace = asyncio.Lock()
+        self._last_request = float("-inf")
         check_impersonate(impersonate)
         if session is None:
             session = AsyncSession(
@@ -136,17 +152,7 @@ class HuurwoningenSource:
         if canonical is None:
             raise ValueError(f"not a huurwoningen.nl listing URL: {url!r}")
 
-        try:
-            response = await self._session.get(canonical, timeout=self._timeout_s)
-        except RequestException as exc:
-            raise SourceFetchError(NAME, canonical, f"{type(exc).__name__}: {exc}") from exc
-
-        status = response.status_code
-        if status >= 400:
-            blocked = status == 403 and response.headers.get("cf-mitigated")
-            reason = "blocked by a Cloudflare bot check" if blocked else f"HTTP {status}"
-            raise SourceFetchError(NAME, canonical, reason, status=status)
-
+        response = await self._get(canonical)
         raw: bytes = response.content
         details = parse_detail_page(raw, canonical)
         if not details.title:
@@ -162,3 +168,41 @@ class HuurwoningenSource:
             raw=raw,
             raw_content_type=response.headers.get("content-type") or "text/html",
         )
+
+    async def index(self, city: str) -> list[IndexEntry]:
+        """Every listing in `city` from the site's sitemap: one request, most recently changed
+        first. Dates without a time zone are taken as UTC."""
+        response = await self._get(BASE_URL + SITEMAP_PATH)
+        slug = city_slug(city)
+        return [
+            IndexEntry(
+                source_listing_id=entry.id,
+                url=canonical_url(entry.url) or entry.url,
+                last_modified=(
+                    entry.lastmod.replace(tzinfo=UTC)
+                    if entry.lastmod and entry.lastmod.tzinfo is None
+                    else entry.lastmod
+                ),
+            )
+            for entry in parse_sitemap(response.content)
+            if entry.city == slug
+        ]
+
+    async def _get(self, url: str) -> Any:
+        async with self._pace:  # one request at a time, spaced out
+            wait = self._last_request + self._min_interval_s - time.monotonic()
+            if wait > 0:
+                await asyncio.sleep(wait)
+            try:
+                response = await self._session.get(url, timeout=self._timeout_s)
+            except RequestException as exc:
+                raise SourceFetchError(NAME, url, f"{type(exc).__name__}: {exc}") from exc
+            finally:
+                self._last_request = time.monotonic()
+
+        status = response.status_code
+        if status >= 400:
+            blocked = status == 403 and response.headers.get("cf-mitigated")
+            reason = "blocked by a Cloudflare bot check" if blocked else f"HTTP {status}"
+            raise SourceFetchError(NAME, url, reason, status=status)
+        return response

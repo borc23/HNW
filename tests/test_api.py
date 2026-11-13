@@ -64,7 +64,8 @@ def test_import_queues_a_job(client: TestClient, adapters: Adapters) -> None:
     response = client.post("/api/listings/import", json={"url": f"  {URL}  "})
     assert response.status_code == 202
     job_id = response.json()["job_id"]
-    assert queued(adapters) == [("import_listing", {"url": URL}, job_id)]  # stripped
+    payload = {"url": URL, "summarize_now": True}  # URL stripped; summarised inline
+    assert queued(adapters) == [("import_listing", payload, job_id)]
 
     job = client.get(f"/api/jobs/{job_id}").json()
     assert job == {

@@ -1,6 +1,6 @@
 """SQLAlchemy tables. The schema itself is owned by the Alembic migrations in `migrations/`."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from geoalchemy2 import Geometry
@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     Text,
     UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -41,7 +42,10 @@ class ListingRow(Base):
     """One ad on one source."""
 
     __tablename__ = "listings"
-    __table_args__ = (UniqueConstraint("source", "url", name="uq_listings_source_url"),)
+    __table_args__ = (
+        UniqueConstraint("source", "url", name="uq_listings_source_url"),
+        Index("ix_listings_source_listing_id", "source", "source_listing_id"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     property_id: Mapped[int | None] = mapped_column(
@@ -64,6 +68,9 @@ class ListingRow(Base):
     interior: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
     raw_blob_key: Mapped[str] = mapped_column(Text)
+    offered_since: Mapped[date | None]
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    summary_pending: Mapped[bool] = mapped_column(server_default=false())
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

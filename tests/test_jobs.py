@@ -1,6 +1,13 @@
-"""reconcile_job_log: finalise jobs_log rows from the queue's own record of each job."""
+"""reconcile_job_log: finalise jobs_log rows from the queue's own record of each job; and the
+scheduling helpers."""
 
-from housing_netherlands.core.jobs import reconcile_job_log
+import asyncio
+from collections.abc import MutableMapping
+from typing import Any
+
+import pytest
+
+from housing_netherlands.core.jobs import Periodic, reconcile_job_log, single_flight
 from housing_netherlands.core.models import JobStatus, QueueJobInfo, QueueJobState
 from tests.fakes import FakeJobLog, FakeJobQueue
 
@@ -54,3 +61,30 @@ async def test_finished_rows_are_not_touched() -> None:
     await log.record("failed", job_type=T, status=JobStatus.FAILED, error="x")
     assert await reconcile_job_log(log, queue) == 0
     assert len(log.records["done"]) == 1 and len(log.records["failed"]) == 1
+
+
+# --- scheduling ---------------------------------------------------------------------------
+
+
+async def test_single_flight_skips_a_run_while_the_previous_one_is_going() -> None:
+    gate = asyncio.Event()
+    runs = []
+
+    async def slow(state: MutableMapping[str, Any]) -> str:
+        runs.append(1)
+        await gate.wait()
+        return "done"
+
+    task = single_flight(slow)
+    first = asyncio.ensure_future(task({}))
+    await asyncio.sleep(0)
+    assert await task({}) is None  # skipped: the first run still holds it
+    gate.set()
+    assert await first == "done" and len(runs) == 1
+    assert await task({}) == "done"  # free again
+
+
+@pytest.mark.parametrize("every", [0, 61])
+def test_periodic_interval_is_validated(every: int) -> None:
+    with pytest.raises(ValueError):
+        Periodic(single_flight(lambda state: asyncio.sleep(0)), every_min=every)
