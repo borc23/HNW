@@ -118,7 +118,9 @@ def test_listings_endpoint_passes_filters(client: TestClient, adapters: Adapters
     )
 
 
-@pytest.mark.parametrize("query", ["interior=sofa", "max_rent=-1", "min_rooms=two", "place="])
+@pytest.mark.parametrize(
+    "query", ["interior=sofa", "max_rent=-1", "min_rooms=two", "place=", "place=%20%20"]
+)
 def test_listings_endpoint_rejects_bad_filters(client: TestClient, query: str) -> None:
     assert client.get(f"/api/listings?{query}").status_code == 422
 
@@ -128,6 +130,12 @@ async def test_places_endpoint(client: TestClient, adapters: Adapters) -> None:
         make_listing(neighbourhood="Zuidplein"), raw_blob_key="k"
     )
     assert client.get("/api/places").json() == ["Rotterdam", "Zuidplein"]
+    assert client.get("/api/places?limit=1").json() == ["Rotterdam"]
+
+
+@pytest.mark.parametrize("limit", [0, 501])
+def test_places_limit_is_bounded(client: TestClient, limit: int) -> None:
+    assert client.get(f"/api/places?limit={limit}").status_code == 422
 
 
 @pytest.mark.parametrize("limit", [0, 201])

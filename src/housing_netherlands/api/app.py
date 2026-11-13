@@ -117,8 +117,10 @@ def create_app(adapters_factory: AdaptersFactory | None = None) -> FastAPI:
         return await adapters(request).listings.list_listings(filters, limit=limit)
 
     @app.get("/api/places")
-    async def list_places(request: Request) -> list[str]:
-        return await adapters(request).listings.list_places()
+    async def list_places(
+        request: Request, limit: Annotated[int, Query(ge=1, le=500)] = 100
+    ) -> list[str]:
+        return await adapters(request).listings.list_places(limit=limit)
 
     # --- plain HTML page for trying it out ------------------------------------------------
 

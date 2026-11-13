@@ -81,7 +81,9 @@ class ListingFilters(BaseModel):
     """What the user is looking for. Unset fields don't filter; a listing that doesn't state
     a filtered value (e.g. no rent shown) does not match, since we can't say it fits."""
 
-    model_config = ConfigDict(frozen=True)  # no extra="forbid": API query params share it
+    # Strip first, so a blank place fails min_length instead of matching everything.
+    # No extra="forbid": the API's query string also carries `limit`.
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
 
     place: str | None = Field(default=None, min_length=1, max_length=100)  # city, area, postcode
     max_rent: int | None = Field(default=None, ge=0)

@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import ColumnElement, func, or_, select, union, update
+from sqlalchemy import ColumnElement, func, or_, select, union_all, update
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -46,7 +46,7 @@ def _conditions(f: ListingFilters) -> list[ColumnElement[bool]]:
     row = ListingRow
     conditions: list[ColumnElement[bool]] = []
     if f.place:
-        place = f.place.strip()
+        place = f.place
         conditions.append(
             or_(
                 row.city.icontains(place, autoescape=True),
@@ -146,11 +146,20 @@ class SqlListingRepository:
         async with self._sessions.begin() as session:
             await session.execute(stmt)
 
-    async def list_places(self) -> list[str]:
-        names = union(
+    async def list_places(self, *, limit: int = 100) -> list[str]:
+        names = union_all(
             select(ListingRow.city.label("name")), select(ListingRow.neighbourhood)
         ).subquery()
-        stmt = select(names.c.name).where(names.c.name.is_not(None)).order_by(names.c.name)
+        key = func.lower(names.c.name)
+        stmt = (
+            # One spelling per case-insensitive name; byte order ("C") prefers "Rotterdam"
+            # over "rotterdam" whatever the database locale.
+            select(func.min(names.c.name.collate("C")))
+            .where(names.c.name.is_not(None))
+            .group_by(key)
+            .order_by(func.count().desc(), key)
+            .limit(limit)
+        )
         async with self._sessions() as session:
             return list((await session.scalars(stmt)).all())
 

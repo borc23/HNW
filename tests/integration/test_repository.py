@@ -198,5 +198,13 @@ async def test_search_fields_round_trip(homes: SqlListingRepository) -> None:
     assert (view.listing.new_build, view.listing.interior) == (True, Interior.FURNISHED)
 
 
-async def test_places_are_distinct_cities_and_neighbourhoods(homes: SqlListingRepository) -> None:
-    assert await homes.list_places() == ["100%_Centrum", "Kop van Zuid", "Rotterdam", "Zuidplein"]
+async def test_places_most_listed_first(homes: SqlListingRepository) -> None:
+    # Rotterdam is the city of all three homes; ties are alphabetical.
+    assert await homes.list_places() == ["Rotterdam", "100%_Centrum", "Kop van Zuid", "Zuidplein"]
+    assert await homes.list_places(limit=2) == ["Rotterdam", "100%_Centrum"]
+
+
+async def test_places_ignore_case(repo: SqlListingRepository) -> None:
+    await repo.upsert_listing(make_listing(city="Rotterdam"), raw_blob_key="a")
+    await repo.upsert_listing(make_listing(url=f"{BASE}/b", city="rotterdam"), raw_blob_key="b")
+    assert await repo.list_places() == ["Rotterdam"]

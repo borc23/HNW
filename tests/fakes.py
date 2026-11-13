@@ -206,11 +206,11 @@ class FakeListingRepository:
             for lid, listing, _ in self.listings.values()
         ][:limit]
 
-    async def list_places(self) -> list[str]:
+    async def list_places(self, *, limit: int = 100) -> list[str]:
         names = {
             n for _, item, _ in self.listings.values() for n in (item.city, item.neighbourhood)
         }
-        return sorted(n for n in names if n)
+        return sorted(n for n in names if n)[:limit]
 
 
 class FakeJobLog:

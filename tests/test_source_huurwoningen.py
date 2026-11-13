@@ -121,6 +121,12 @@ def test_search_fields_are_normalised(
     )
 
 
+@pytest.mark.parametrize(("year", "expected"), [(1965, 1965), (0, None), (19655, None)])
+def test_implausible_build_year_becomes_unknown(year: int, expected: int | None) -> None:
+    details = ListingDetails(id="x", url=URL, title="T", build_year=year)
+    assert to_listing(details, URL).build_year == expected
+
+
 def test_main_photo_is_kept() -> None:
     details = ListingDetails(id="x", url=URL, title="T", image_url="https://cdn.example/1.jpg")
     assert to_listing(details, URL).image_url == "https://cdn.example/1.jpg"

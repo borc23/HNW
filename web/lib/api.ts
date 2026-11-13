@@ -6,6 +6,7 @@ import "server-only";
 import { toQuery, type Filters, type Interior } from "@/lib/filters";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
+const PLACES_REVALIDATE_S = 300; // suggestions change slowly; don't query them on every render
 
 export interface Listing {
   url: string;
@@ -39,10 +40,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string): Promise<T> {
+/** `revalidateS` caches the response that many seconds; without it, every call is fresh. */
+async function request<T>(path: string, revalidateS?: number): Promise<T> {
+  const caching: RequestInit =
+    revalidateS === undefined ? { cache: "no-store" } : { next: { revalidate: revalidateS } };
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, { cache: "no-store" });
+    response = await fetch(`${API_URL}${path}`, caching);
   } catch {
     throw new ApiError("We can't reach the NL Housing server right now. Is it running?");
   }
@@ -65,5 +69,5 @@ export const api = {
     const query = toQuery(filters);
     return request<ListingView[]>(`/api/listings?limit=${limit}${query && `&${query}`}`);
   },
-  listPlaces: () => request<string[]>("/api/places"),
+  listPlaces: () => request<string[]>("/api/places", PLACES_REVALIDATE_S),
 };

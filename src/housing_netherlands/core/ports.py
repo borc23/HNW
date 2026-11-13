@@ -89,8 +89,9 @@ class ListingRepository(Protocol):
         """Newest first, narrowed by `filters` (see `ListingFilters` for the matching rules)."""
         ...
 
-    async def list_places(self) -> list[str]:
-        """Distinct cities and neighbourhoods of stored listings, for location suggestions."""
+    async def list_places(self, *, limit: int = 100) -> list[str]:
+        """Cities and neighbourhoods for location suggestions: most listings first, each name
+        once regardless of case, at most `limit`."""
         ...
 
 

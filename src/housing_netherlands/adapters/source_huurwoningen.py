@@ -52,6 +52,11 @@ def _lookup[T](table: dict[str, T], value: str | None) -> T | None:
     return table.get(value.strip().lower()) if value else None
 
 
+def _plausible_year(year: int | None) -> int | None:
+    """Typos like 0 or 19655 become unknown; a bad optional field must not fail the import."""
+    return year if year is not None and 1000 <= year <= 2100 else None
+
+
 def to_listing(details: ListingDetails, url: str) -> Listing:
     locality = " ".join(p for p in (details.postcode, details.city) if p)
     return Listing(
@@ -72,7 +77,7 @@ def to_listing(details: ListingDetails, url: str) -> Listing:
         longitude=details.longitude,
         description=details.description,
         image_url=details.image_url,
-        build_year=details.build_year,
+        build_year=_plausible_year(details.build_year),
         new_build=_lookup(_CONSTRUCTION, details.construction_type),
         interior=_lookup(_INTERIORS, details.interior),
     )
