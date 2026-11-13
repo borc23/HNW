@@ -90,3 +90,15 @@ class RetryLater(DomainError):
         super().__init__(f"retry in {delay_s:g} s: {reason}")
         self.delay_s = delay_s
         self.reason = reason
+
+
+class LLMUnavailableError(DomainError):
+    """The model could not be reached or was temporarily overloaded (connection refused,
+    timeout, rate limit, 5xx). Worth retrying later; the request itself was fine."""
+
+    retryable = True
+
+    def __init__(self, model: str, reason: str) -> None:
+        super().__init__(f"{model}: {reason}")
+        self.model = model
+        self.reason = reason

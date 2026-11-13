@@ -8,6 +8,7 @@ import pytest
 
 from housing_netherlands.core.errors import (
     LLMOutputInvalid,
+    LLMUnavailableError,
     RetryLater,
     SourceFetchError,
     SourceParseError,
@@ -20,7 +21,11 @@ from housing_netherlands.core.importing import (
     request_import,
     run_import_job,
 )
-from housing_netherlands.core.models import FetchedListing, JobStatus, LLMParams
+from housing_netherlands.core.models import (
+    FetchedListing,
+    JobStatus,
+    LLMParams,
+)
 from tests.fakes import (
     FakeBlobStore,
     FakeJobLog,
@@ -29,6 +34,7 @@ from tests.fakes import (
     FakeLLMClient,
     FakeSourceAdapter,
     HangingLLM,
+    UnavailableLLM,
 )
 from tests.test_core_models import make_listing
 
@@ -264,3 +270,29 @@ async def test_run_past_max_attempts_still_finishes_the_job() -> None:
     ok = make_deps(SUMMARY)
     await run_import_job(ok, job_id="job-2", url=URL, attempt=4)
     assert statuses(ok, "job-2") == [JobStatus.RUNNING, JobStatus.SUCCEEDED]
+
+
+# --- LLM temporarily unavailable ------------------------------------------------------------
+
+
+async def test_llm_unavailable_is_retried_and_listing_is_kept() -> None:
+    deps = ImportDeps(**{**make_deps().__dict__, "llm": UnavailableLLM(SUMMARY, failures=1)})
+    with pytest.raises(RetryLater) as exc_info:
+        await run_import_job(deps, job_id="job-1", url=URL, attempt=1)
+    assert exc_info.value.delay_s == 30
+    assert statuses(deps) == [JobStatus.RUNNING, JobStatus.QUEUED]
+    assert "attempt 1/3 failed, retrying" in (last_error(deps) or "")
+    [view] = await deps.listings.list_listings()
+    assert view.summary is None  # stored, summary pending
+
+    await run_import_job(deps, job_id="job-1", url=URL, attempt=2)  # Ollama is back
+    assert statuses(deps)[-1] is JobStatus.SUCCEEDED
+    [view] = await deps.listings.list_listings()  # same row, now with its summary
+    assert view.summary is not None
+
+
+async def test_llm_unavailable_on_last_attempt_fails() -> None:
+    deps = ImportDeps(**{**make_deps().__dict__, "llm": UnavailableLLM(failures=1)})
+    with pytest.raises(LLMUnavailableError):
+        await run_import_job(deps, job_id="job-1", url=URL, attempt=3)
+    assert statuses(deps) == [JobStatus.RUNNING, JobStatus.FAILED]

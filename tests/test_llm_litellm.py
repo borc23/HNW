@@ -3,12 +3,14 @@
 from types import SimpleNamespace
 from typing import Any
 
+import litellm
 import pytest
 
 from housing_netherlands.adapters import llm_litellm
 from housing_netherlands.adapters.llm_litellm import LiteLLMClient
 from housing_netherlands.config import Settings
 from housing_netherlands.core import ports
+from housing_netherlands.core.errors import LLMUnavailableError
 from housing_netherlands.core.models import ListingSummary, LLMMessage, LLMParams
 from housing_netherlands.wiring import build_llm_client, extract_llm_params
 
@@ -102,3 +104,62 @@ def test_wiring_passes_llm_settings() -> None:
     assert extract_llm_params(settings) == LLMParams(
         model="anthropic/claude-haiku-5-5", reasoning_effort="low"
     )
+
+
+# --- error mapping: temporary vs permanent -----------------------------------------------
+
+
+def _litellm_error(cls: type[Exception]) -> Exception:
+    return cls(message="boom", llm_provider="ollama", model="qwen3.5:4b")  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(
+    "error_cls",
+    [
+        litellm.exceptions.APIConnectionError,
+        litellm.exceptions.Timeout,
+        litellm.exceptions.RateLimitError,
+        litellm.exceptions.ServiceUnavailableError,
+        litellm.exceptions.InternalServerError,
+        litellm.exceptions.BadGatewayError,
+    ],
+)
+async def test_temporary_llm_errors_become_llm_unavailable(
+    monkeypatch: pytest.MonkeyPatch, error_cls: type[Exception]
+) -> None:
+    async def failing(**kwargs: Any) -> Any:
+        raise _litellm_error(error_cls)
+
+    monkeypatch.setattr(llm_litellm.litellm, "acompletion", failing)
+    client = LiteLLMClient(ollama_api_base=None, timeout_s=1)
+    with pytest.raises(LLMUnavailableError) as exc_info:
+        await client.complete(MESSAGES, params=LLMParams(model="ollama_chat/qwen3.5:4b"))
+    assert exc_info.value.retryable
+    assert isinstance(exc_info.value.__cause__, error_cls)
+
+
+@pytest.mark.parametrize(
+    "error_cls",
+    [
+        litellm.exceptions.AuthenticationError,
+        litellm.exceptions.BadRequestError,
+        litellm.exceptions.NotFoundError,  # e.g. model not pulled
+    ],
+)
+async def test_permanent_llm_errors_are_not_wrapped(
+    monkeypatch: pytest.MonkeyPatch, error_cls: type[Exception]
+) -> None:
+    async def failing(**kwargs: Any) -> Any:
+        raise _litellm_error(error_cls)
+
+    monkeypatch.setattr(llm_litellm.litellm, "acompletion", failing)
+    client = LiteLLMClient(ollama_api_base=None, timeout_s=1)
+    with pytest.raises(error_cls):
+        await client.complete(MESSAGES, params=LLMParams(model="ollama_chat/qwen3.5:4b"))
+
+
+async def test_unreachable_ollama_raises_llm_unavailable() -> None:
+    # Real litellm call to a closed port: the same error as "Ollama is restarting".
+    client = LiteLLMClient(ollama_api_base="http://127.0.0.1:9", timeout_s=5)
+    with pytest.raises(LLMUnavailableError, match="APIConnectionError"):
+        await client.complete(MESSAGES, params=LLMParams(model="ollama_chat/qwen3.5:4b"))

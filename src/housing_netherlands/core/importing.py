@@ -11,7 +11,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from housing_netherlands.core.errors import RetryLater, SourceFetchError, UnsupportedUrlError
+from housing_netherlands.core.errors import (
+    LLMUnavailableError,
+    RetryLater,
+    SourceFetchError,
+    UnsupportedUrlError,
+)
 from housing_netherlands.core.models import JobStatus, LLMParams
 from housing_netherlands.core.ports import (
     BlobStore,
@@ -113,8 +118,10 @@ async def import_listing(deps: ImportDeps, url: str) -> ImportResult:
 async def run_import_job(deps: ImportDeps, *, job_id: str, url: str, attempt: int) -> ImportResult:
     """One attempt of an import job, with `jobs_log` kept in step.
 
-    A retryable fetch failure (network, bot block, 5xx) with attempts left raises `RetryLater`
-    and the job goes back to QUEUED; any other error, or the last attempt, is final (FAILED).
+    A temporary failure (fetch: network, bot block, 5xx; LLM: unreachable, timeout, rate limit)
+    with attempts left raises `RetryLater` and the job goes back to QUEUED; any other error, or
+    the last attempt, is final (FAILED). A retry runs the whole import again (fresh fetch and raw
+    snapshot); the listing row is upserted, so nothing is duplicated.
     Cancellation (job timeout, worker shutdown) is recorded as FAILED too, then re-raised; if
     the queue runs the job again, that attempt moves it back to RUNNING. `attempt` counts every
     run, including interrupted ones, so a run past `max_attempts` (the queue allows headroom
@@ -124,7 +131,7 @@ async def run_import_job(deps: ImportDeps, *, job_id: str, url: str, attempt: in
     await record(job_id, job_type=IMPORT_LISTING_JOB, status=JobStatus.RUNNING)
     try:
         result = await import_listing(deps, url)
-    except SourceFetchError as exc:
+    except (SourceFetchError, LLMUnavailableError) as exc:
         if exc.retryable and attempt < deps.max_attempts:
             delay = deps.retry_base_delay_s * 2 ** (attempt - 1)
             error = f"attempt {attempt}/{deps.max_attempts} failed, retrying in {delay:g} s: {exc}"

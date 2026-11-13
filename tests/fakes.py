@@ -4,7 +4,7 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
-from housing_netherlands.core.errors import DuplicateJobError
+from housing_netherlands.core.errors import DuplicateJobError, LLMUnavailableError
 from housing_netherlands.core.models import (
     FetchedListing,
     JobStatus,
@@ -91,6 +91,26 @@ class HangingLLM(FakeLLMClient):
         self.started.set()
         await asyncio.Event().wait()
         raise AssertionError("unreachable")
+
+
+class UnavailableLLM(FakeLLMClient):
+    """Fails like Ollama restarting, `failures` times, then answers normally."""
+
+    def __init__(self, *replies: str, failures: int) -> None:
+        super().__init__(*replies)
+        self.failures = failures
+
+    async def complete(
+        self,
+        messages: list[LLMMessage],
+        *,
+        params: LLMParams,
+        json_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        if self.failures:
+            self.failures -= 1
+            raise LLMUnavailableError(params.model, "APIConnectionError: connection refused")
+        return await super().complete(messages, params=params, json_schema=json_schema)
 
 
 class FakeSourceAdapter:

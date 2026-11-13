@@ -10,6 +10,7 @@ from housing_netherlands.core.errors import (
     DomainError,
     DuplicateJobError,
     LLMOutputInvalid,
+    LLMUnavailableError,
     RetryLater,
     SourceError,
     SourceFetchError,
@@ -27,6 +28,7 @@ CASES = [
     LLMOutputInvalid("summary-v1", ["not json", "key_facts: too short"]),
     UnsupportedUrlError("https://example.com/x"),
     RetryLater(30.0, "huurwoningen: HTTP 503"),
+    LLMUnavailableError("ollama_chat/qwen3.5:4b", "APIConnectionError: connection refused"),
 ]
 
 

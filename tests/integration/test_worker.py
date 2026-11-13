@@ -24,7 +24,7 @@ from housing_netherlands.core.models import FetchedListing, LLMParams, QueueJobS
 from housing_netherlands.core.models import JobStatus as LogStatus
 from housing_netherlands.wiring import build_worker_settings, connect_blob_store
 from housing_netherlands.workers.main import HANDLERS
-from tests.fakes import FakeLLMClient, FakeSourceAdapter, HangingLLM
+from tests.fakes import FakeLLMClient, FakeSourceAdapter, HangingLLM, UnavailableLLM
 from tests.test_core_models import make_listing
 
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
@@ -269,3 +269,18 @@ async def test_reconcile_leaves_finished_and_running_jobs_alone(
         await queue.close()
     assert (await job_row(sessions, done))[0] == "succeeded"
     assert (await job_row(sessions, waiting))[0] == "queued"
+
+
+async def test_llm_unavailable_is_retried_by_the_worker(
+    settings: Settings, sessions: Sessions
+) -> None:
+    source = FakeSourceAdapter("huurwoningen", "huurwoningen.nl", FETCHED)
+    job_id = await enqueue(settings, sessions, source)
+    await run_worker_until_idle(settings, sessions, source, UnavailableLLM(SUMMARY, failures=1))
+
+    assert source.fetched_urls == [URL, URL]  # attempt 2 re-ran the import
+    assert await job_row(sessions, job_id) == ("succeeded", None)
+    async with sessions() as s:
+        # the retry upserted the same listing instead of adding a second one
+        assert await s.scalar(text("SELECT count(*) FROM listings")) == 1
+        assert await s.scalar(text("SELECT count(*) FROM listing_enrichments")) == 1
