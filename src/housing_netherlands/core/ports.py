@@ -4,6 +4,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from housing_netherlands.core.models import (
     FetchedListing,
+    JobRecord,
     JobStatus,
     Listing,
     ListingSummary,
@@ -91,6 +92,8 @@ class JobLog(Protocol):
     ) -> None:
         """Create or update the `jobs_log` row for `job_id`."""
         ...
+
+    async def get(self, job_id: str) -> JobRecord | None: ...
 
     async def unfinished(self, *, older_than_s: float) -> list[UnfinishedJob]:
         """Jobs still QUEUED or RUNNING whose row was created more than `older_than_s` ago."""

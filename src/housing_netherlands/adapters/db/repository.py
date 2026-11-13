@@ -13,6 +13,7 @@ from housing_netherlands.adapters.db.models import (
     PropertyRow,
 )
 from housing_netherlands.core.models import (
+    JobRecord,
     JobStatus,
     Listing,
     ListingSummary,
@@ -172,6 +173,15 @@ class SqlJobLog:
         )
         async with self._sessions.begin() as session:
             await session.execute(stmt)
+
+    async def get(self, job_id: str) -> JobRecord | None:
+        async with self._sessions() as session:
+            row = await session.get(JobLogRow, job_id)
+        if row is None:
+            return None
+        return JobRecord(
+            job_id=row.id, job_type=row.type, status=JobStatus(row.status), error=row.error
+        )
 
     async def unfinished(self, *, older_than_s: float) -> list[UnfinishedJob]:
         open_states = (JobStatus.QUEUED.value, JobStatus.RUNNING.value)

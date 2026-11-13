@@ -7,6 +7,7 @@ from typing import Any
 from housing_netherlands.core.errors import DuplicateJobError, LLMUnavailableError
 from housing_netherlands.core.models import (
     FetchedListing,
+    JobRecord,
     JobStatus,
     Listing,
     ListingSummary,
@@ -189,6 +190,12 @@ class FakeJobLog:
         self, job_id: str, *, job_type: str, status: JobStatus, error: str | None = None
     ) -> None:
         self.records.setdefault(job_id, []).append((job_type, status, error))
+
+    async def get(self, job_id: str) -> JobRecord | None:
+        if job_id not in self.records:
+            return None
+        job_type, status, error = self.records[job_id][-1]
+        return JobRecord(job_id=job_id, job_type=job_type, status=status, error=error)
 
     async def unfinished(self, *, older_than_s: float) -> list[UnfinishedJob]:
         """Ignores age (the SQL adapter's age filter has its own integration test)."""

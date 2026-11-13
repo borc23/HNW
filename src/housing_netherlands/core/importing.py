@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from housing_netherlands.core.errors import (
+    EnqueueFailedError,
     LLMUnavailableError,
     RetryLater,
     SourceFetchError,
@@ -73,7 +74,8 @@ async def request_import(
 ) -> str:
     """Validate `url` and queue an import job; return its job id.
 
-    Raises `UnsupportedUrlError` (nothing queued) if no enabled source handles the URL.
+    Raises `UnsupportedUrlError` (nothing queued) if no enabled source handles the URL, and
+    `EnqueueFailedError` (job logged as FAILED, id included) if the queue is unavailable.
     """
     find_source(sources, url)
     job_id = uuid.uuid4().hex
@@ -85,7 +87,7 @@ async def request_import(
         await job_log.record(
             job_id, job_type=IMPORT_LISTING_JOB, status=JobStatus.FAILED, error=f"enqueue: {exc}"
         )
-        raise
+        raise EnqueueFailedError(job_id, f"{type(exc).__name__}: {exc}") from exc
     return job_id
 
 
