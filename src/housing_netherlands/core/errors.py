@@ -73,3 +73,20 @@ class LLMOutputInvalid(DomainError):
         )
         self.prompt_version = prompt_version
         self.errors = errors
+
+
+class UnsupportedUrlError(DomainError):
+    """No enabled source handles this URL (unknown site, not a listing page, or disabled)."""
+
+    def __init__(self, url: str) -> None:
+        super().__init__(f"no enabled source handles {url!r}")
+        self.url = url
+
+
+class RetryLater(DomainError):
+    """A job attempt failed temporarily; the queue should run it again after `delay_s`."""
+
+    def __init__(self, delay_s: float, reason: str) -> None:
+        super().__init__(f"retry in {delay_s:g} s: {reason}")
+        self.delay_s = delay_s
+        self.reason = reason

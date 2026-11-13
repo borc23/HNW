@@ -1,6 +1,6 @@
 [project]
 name = "housing-netherlands"
-version = "0.1.6"
+version = "0.1.7"
 description = "Personal housing dashboard for the Dutch rental market."
 readme = "README.md"
 authors = [
@@ -69,6 +69,8 @@ asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     # Raised inside litellm's own TypedDicts when pydantic builds their schema; not our code.
     "ignore:Item .* is using the `ReadOnly` qualifier:UserWarning",
+    # Raised inside arq's Worker.close() (redis-py deprecation); not our code.
+    "ignore:Call to deprecated close:DeprecationWarning",
 ]
 markers = [
     "integration: needs the Docker Compose stack (postgres, redis, minio); deselect with -m 'not integration'",

@@ -18,8 +18,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:3.12-slim-bookworm
 RUN useradd --create-home --uid 1000 app
-COPY --from=builder --chown=app:app /app/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 WORKDIR /app
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+# Migrations run from the same image (compose `migrate` service).
+COPY --chown=app:app alembic.ini ./
+COPY --chown=app:app migrations/ migrations/
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 USER app
 CMD ["housing-netherlands"]

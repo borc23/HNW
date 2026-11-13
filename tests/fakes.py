@@ -62,17 +62,32 @@ class FakeLLMClient:
 
 
 class FakeSourceAdapter:
-    def __init__(self, name: str, host: str, fetched: FetchedListing | None = None) -> None:
+    """Returns `fetched` on every call, or plays `outcomes` in order (an exception is raised)."""
+
+    def __init__(
+        self,
+        name: str,
+        host: str,
+        fetched: FetchedListing | None = None,
+        *,
+        outcomes: list[FetchedListing | Exception] | None = None,
+    ) -> None:
         self.name = name
         self.host = host
         self.fetched = fetched
+        self.outcomes = list(outcomes or [])
+        self.fetched_urls: list[str] = []
 
     def can_handle(self, url: str) -> bool:
         return self.host in url
 
     async def fetch(self, url: str) -> FetchedListing:
-        assert self.fetched is not None, "FakeSourceAdapter has no listing to return"
-        return self.fetched
+        self.fetched_urls.append(url)
+        outcome = self.outcomes.pop(0) if self.outcomes else self.fetched
+        if isinstance(outcome, Exception):
+            raise outcome
+        assert outcome is not None, "FakeSourceAdapter has no listing to return"
+        return outcome
 
 
 class FakeListingRepository:

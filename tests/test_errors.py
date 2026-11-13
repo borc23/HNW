@@ -10,9 +10,11 @@ from housing_netherlands.core.errors import (
     DomainError,
     DuplicateJobError,
     LLMOutputInvalid,
+    RetryLater,
     SourceError,
     SourceFetchError,
     SourceParseError,
+    UnsupportedUrlError,
 )
 
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
@@ -23,6 +25,8 @@ CASES = [
     SourceParseError("huurwoningen", URL, "no JSON-LD on page"),
     DuplicateJobError("job-1"),
     LLMOutputInvalid("summary-v1", ["not json", "key_facts: too short"]),
+    UnsupportedUrlError("https://example.com/x"),
+    RetryLater(30.0, "huurwoningen: HTTP 503"),
 ]
 
 

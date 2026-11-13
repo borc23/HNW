@@ -10,9 +10,11 @@ from housing_netherlands.adapters.db import (
     create_engine,
     create_session_factory,
 )
-from housing_netherlands.adapters.queue_arq import ArqJobQueue
+from housing_netherlands.adapters.queue_arq import ArqJobQueue, worker_settings
 from housing_netherlands.adapters.source_huurwoningen import HuurwoningenSource
 from housing_netherlands.config import Settings
+from housing_netherlands.core.importing import ImportDeps
+from housing_netherlands.core.jobs import JobHandler, Lifecycle
 from housing_netherlands.core.models import LLMParams
 from housing_netherlands.core.ports import (
     BlobStore,
@@ -119,3 +121,40 @@ async def build_adapters(settings: Settings) -> AsyncIterator[Adapters]:
             llm=build_llm_client(settings),
             sources=build_sources(settings, stack),
         )
+
+
+def import_deps(adapters: Adapters, settings: Settings) -> ImportDeps:
+    return ImportDeps(
+        listings=adapters.listings,
+        job_log=adapters.job_log,
+        blobs=adapters.blobs,
+        llm=adapters.llm,
+        sources=adapters.sources,
+        llm_params=extract_llm_params(settings),
+        max_attempts=settings.import_max_attempts,
+        retry_base_delay_s=settings.import_retry_base_delay_s,
+    )
+
+
+def build_worker_settings(
+    settings: Settings,
+    *,
+    handlers: dict[str, JobHandler],
+    on_startup: Lifecycle,
+    on_shutdown: Lifecycle,
+) -> type:
+    """The queue backend's worker runner for these handlers."""
+    # Upper bound for one attempt: fetch + archive + LLM call and its one retry, plus margin.
+    job_timeout_s = settings.huurwoningen_timeout_s + 2 * settings.llm_timeout_s + 60
+    match settings.queue_backend:
+        case "redis":
+            return worker_settings(
+                redis_url=settings.redis_url,
+                handlers=handlers,
+                on_startup=on_startup,
+                on_shutdown=on_shutdown,
+                max_tries=settings.import_max_attempts,
+                job_timeout_s=job_timeout_s,
+            )
+        case _:
+            assert_never(settings.queue_backend)
