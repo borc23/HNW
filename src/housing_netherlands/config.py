@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # curl_cffi browser profile, e.g. "chrome", "safari", "firefox"; change it if the site blocks
     huurwoningen_impersonate: str = "chrome"
 
+    # Import jobs: retryable fetch failures are retried with backoff (30 s, 60 s, ...).
+    import_max_attempts: int = Field(default=3, ge=1)
+    import_retry_base_delay_s: float = Field(default=30.0, ge=0)
+
     @field_validator("storage_endpoint", "ollama_api_base", "llm_reasoning_effort", mode="before")
     @classmethod
     def _empty_means_unset(cls, value: object) -> object:

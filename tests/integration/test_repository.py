@@ -94,3 +94,27 @@ async def test_job_log_lifecycle(sessions: Sessions) -> None:
     assert (row.status, row.error) == ("failed", "boom")
     assert row.started_at is not None and row.finished_at is not None
     assert row.finished_at >= row.started_at
+
+
+async def test_job_log_unfinished_lists_only_old_open_jobs(sessions: Sessions) -> None:
+    log = SqlJobLog(sessions)
+    for job_id, status in [
+        ("old-queued", JobStatus.QUEUED),
+        ("old-running", JobStatus.RUNNING),
+        ("old-done", JobStatus.SUCCEEDED),
+        ("old-failed", JobStatus.FAILED),
+        ("new-queued", JobStatus.QUEUED),
+    ]:
+        await log.record(job_id, job_type="import_listing", status=status)
+    async with sessions.begin() as s:
+        backdate = (
+            "UPDATE jobs_log SET created_at = now() - interval '10 minutes' WHERE id LIKE 'old-%'"
+        )
+        await s.execute(text(backdate))
+
+    unfinished = await log.unfinished(older_than_s=120)
+    assert {(j.job_id, j.job_type) for j in unfinished} == {
+        ("old-queued", "import_listing"),
+        ("old-running", "import_listing"),
+    }
+    assert await log.unfinished(older_than_s=3600) == []

@@ -12,7 +12,13 @@ from housing_netherlands.adapters.db.models import (
     ListingRow,
     PropertyRow,
 )
-from housing_netherlands.core.models import JobStatus, Listing, ListingSummary, ListingView
+from housing_netherlands.core.models import (
+    JobStatus,
+    Listing,
+    ListingSummary,
+    ListingView,
+    UnfinishedJob,
+)
 
 _LISTING_FIELDS = (
     "source_listing_id",
@@ -166,3 +172,15 @@ class SqlJobLog:
         )
         async with self._sessions.begin() as session:
             await session.execute(stmt)
+
+    async def unfinished(self, *, older_than_s: float) -> list[UnfinishedJob]:
+        open_states = (JobStatus.QUEUED.value, JobStatus.RUNNING.value)
+        cutoff = func.now() - func.make_interval(0, 0, 0, 0, 0, 0, older_than_s)
+        stmt = (
+            select(JobLogRow.id, JobLogRow.type)
+            .where(JobLogRow.status.in_(open_states), JobLogRow.created_at < cutoff)
+            .order_by(JobLogRow.created_at)
+        )
+        async with self._sessions() as session:
+            rows = (await session.execute(stmt)).all()
+        return [UnfinishedJob(job_id=job_id, job_type=job_type) for job_id, job_type in rows]

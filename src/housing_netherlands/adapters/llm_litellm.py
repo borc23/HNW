@@ -16,11 +16,25 @@ os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 import litellm
 from litellm import ModelResponse
 
+from housing_netherlands.core.errors import LLMUnavailableError
 from housing_netherlands.core.models import LLMMessage, LLMParams, LLMResponse
 
 litellm.suppress_debug_info = True
 
 OLLAMA_PREFIXES = ("ollama/", "ollama_chat/")
+
+# Temporary: the request was fine but the model wasn't reachable or was overloaded.
+# APIConnectionError covers Ollama being down ("connection refused"). litellm.Timeout must be
+# listed too: it derives from openai's APIConnectionError, not litellm's.
+# Anything else (auth, bad request, model not found, context too long) won't fix itself.
+_TRANSIENT = (
+    litellm.exceptions.APIConnectionError,
+    litellm.exceptions.Timeout,
+    litellm.exceptions.RateLimitError,
+    litellm.exceptions.ServiceUnavailableError,
+    litellm.exceptions.InternalServerError,
+    litellm.exceptions.BadGatewayError,
+)
 
 
 class LiteLLMClient:
@@ -51,12 +65,20 @@ class LiteLLMClient:
         if params.reasoning_effort:
             # "none" turns off "thinking" on reasoning models (qwen3.5 on CPU: ~25 s vs >180 s).
             kwargs["reasoning_effort"] = params.reasoning_effort
+        try:
+            response = await self._acompletion(messages, params, kwargs)
+        except _TRANSIENT as exc:
+            raise LLMUnavailableError(params.model, f"{type(exc).__name__}: {exc}") from exc
+        return LLMResponse(text=response.choices[0].message.content or "", model=params.model)
+
+    async def _acompletion(
+        self, messages: list[LLMMessage], params: LLMParams, kwargs: dict[str, Any]
+    ) -> ModelResponse:
         # Without stream=True, acompletion returns a ModelResponse (never a stream wrapper).
-        response: ModelResponse = await litellm.acompletion(  # type: ignore[assignment]
+        return await litellm.acompletion(  # type: ignore[return-value]
             model=params.model,
             messages=[m.model_dump() for m in messages],
             timeout=self._timeout_s,
             drop_params=True,  # skip params a provider doesn't support instead of failing
             **kwargs,
         )
-        return LLMResponse(text=response.choices[0].message.content or "", model=params.model)

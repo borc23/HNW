@@ -11,6 +11,8 @@ from housing_netherlands.core.models import (
     LLMMessage,
     LLMParams,
     LLMResponse,
+    QueueJobInfo,
+    UnfinishedJob,
 )
 
 
@@ -23,6 +25,10 @@ class JobQueue(Protocol):
         deduplication key. Raises `DuplicateJobError` if a job with that id is still known to the
         queue (queued, running, or its result retained); the job is then NOT queued again.
         """
+        ...
+
+    async def job_info(self, job_id: str) -> QueueJobInfo:
+        """What the queue knows about `job_id`, including failures where no handler ran."""
         ...
 
 
@@ -84,4 +90,8 @@ class JobLog(Protocol):
         self, job_id: str, *, job_type: str, status: JobStatus, error: str | None = None
     ) -> None:
         """Create or update the `jobs_log` row for `job_id`."""
+        ...
+
+    async def unfinished(self, *, older_than_s: float) -> list[UnfinishedJob]:
+        """Jobs still QUEUED or RUNNING whose row was created more than `older_than_s` ago."""
         ...

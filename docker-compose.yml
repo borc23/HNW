@@ -88,6 +88,45 @@ services:
     command: ["pull", "${OLLAMA_MODEL:-qwen3.5:4b}"]
     restart: "no"
 
+  # --- application (one image; services differ by command) ---
+
+  # One-shot: apply database migrations before the app starts.
+  migrate:
+    build: .
+    image: housing-netherlands-app
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - path: .env
+        required: false
+    environment: &app-env
+      # Container hostnames override the localhost values in .env (used by host-run tools).
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-housing}:${POSTGRES_PASSWORD:-housing}@postgres:5432/${POSTGRES_DB:-housing}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_ENDPOINT: http://seaweedfs:8333
+      OLLAMA_API_BASE: http://ollama:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  worker:
+    image: housing-netherlands-app
+    command: ["arq", "housing_netherlands.workers.main.WorkerSettings"]
+    env_file:
+      - path: .env
+        required: false
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      seaweedfs-init:
+        condition: service_completed_successfully
+      ollama-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 configs:
   seaweedfs-s3:
     content: |

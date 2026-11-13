@@ -1,9 +1,10 @@
 """In-memory implementations of the core ports, for unit tests."""
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
-from housing_netherlands.core.errors import DuplicateJobError
+from housing_netherlands.core.errors import DuplicateJobError, LLMUnavailableError
 from housing_netherlands.core.models import (
     FetchedListing,
     JobStatus,
@@ -13,6 +14,9 @@ from housing_netherlands.core.models import (
     LLMMessage,
     LLMParams,
     LLMResponse,
+    QueueJobInfo,
+    QueueJobState,
+    UnfinishedJob,
 )
 
 
@@ -21,11 +25,19 @@ class FakeJobQueue:
 
     def __init__(self) -> None:
         self.jobs: list[tuple[str, dict[str, Any], str]] = []
+        self.infos: dict[str, QueueJobInfo] = {}
 
     async def enqueue(self, job_name: str, payload: dict[str, Any], *, job_id: str) -> None:
         if any(existing == job_id for _, _, existing in self.jobs):
             raise DuplicateJobError(job_id)
         self.jobs.append((job_name, payload, job_id))
+
+    async def job_info(self, job_id: str) -> QueueJobInfo:
+        """`infos` overrides; otherwise queued jobs are PENDING and others UNKNOWN."""
+        if job_id in self.infos:
+            return self.infos[job_id]
+        queued = any(existing == job_id for _, _, existing in self.jobs)
+        return QueueJobInfo(state=QueueJobState.PENDING if queued else QueueJobState.UNKNOWN)
 
 
 class FakeBlobStore:
@@ -61,18 +73,73 @@ class FakeLLMClient:
         return LLMResponse(text=self.responses.pop(0), model=params.model)
 
 
+class HangingLLM(FakeLLMClient):
+    """An LLM call that never returns (e.g. a slow CPU model) until cancelled; `started` is set
+    once the call is in progress."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+
+    async def complete(
+        self,
+        messages: list[LLMMessage],
+        *,
+        params: LLMParams,
+        json_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        self.started.set()
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+
+class UnavailableLLM(FakeLLMClient):
+    """Fails like Ollama restarting, `failures` times, then answers normally."""
+
+    def __init__(self, *replies: str, failures: int) -> None:
+        super().__init__(*replies)
+        self.failures = failures
+
+    async def complete(
+        self,
+        messages: list[LLMMessage],
+        *,
+        params: LLMParams,
+        json_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        if self.failures:
+            self.failures -= 1
+            raise LLMUnavailableError(params.model, "APIConnectionError: connection refused")
+        return await super().complete(messages, params=params, json_schema=json_schema)
+
+
 class FakeSourceAdapter:
-    def __init__(self, name: str, host: str, fetched: FetchedListing | None = None) -> None:
+    """Returns `fetched` on every call, or plays `outcomes` in order (an exception is raised)."""
+
+    def __init__(
+        self,
+        name: str,
+        host: str,
+        fetched: FetchedListing | None = None,
+        *,
+        outcomes: list[FetchedListing | Exception] | None = None,
+    ) -> None:
         self.name = name
         self.host = host
         self.fetched = fetched
+        self.outcomes = list(outcomes or [])
+        self.fetched_urls: list[str] = []
 
     def can_handle(self, url: str) -> bool:
         return self.host in url
 
     async def fetch(self, url: str) -> FetchedListing:
-        assert self.fetched is not None, "FakeSourceAdapter has no listing to return"
-        return self.fetched
+        self.fetched_urls.append(url)
+        outcome = self.outcomes.pop(0) if self.outcomes else self.fetched
+        if isinstance(outcome, Exception):
+            raise outcome
+        assert outcome is not None, "FakeSourceAdapter has no listing to return"
+        return outcome
 
 
 class FakeListingRepository:
@@ -122,3 +189,12 @@ class FakeJobLog:
         self, job_id: str, *, job_type: str, status: JobStatus, error: str | None = None
     ) -> None:
         self.records.setdefault(job_id, []).append((job_type, status, error))
+
+    async def unfinished(self, *, older_than_s: float) -> list[UnfinishedJob]:
+        """Ignores age (the SQL adapter's age filter has its own integration test)."""
+        open_states = (JobStatus.QUEUED, JobStatus.RUNNING)
+        return [
+            UnfinishedJob(job_id=job_id, job_type=records[-1][0])
+            for job_id, records in self.records.items()
+            if records[-1][1] in open_states
+        ]
