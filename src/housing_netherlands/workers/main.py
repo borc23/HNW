@@ -90,7 +90,10 @@ async def sync(state: MutableMapping[str, Any]) -> list[str]:
 
 
 async def summarize_backlog(state: MutableMapping[str, Any]) -> int:
-    return await summarize_pending(state["deps"], budget_s=get_settings().summary_batch_s)
+    backoff = state.setdefault("summary_backoff", {})  # per worker process, across runs
+    return await summarize_pending(
+        state["deps"], budget_s=get_settings().summary_batch_s, backoff=backoff
+    )
 
 
 def periodic_tasks(settings: Settings) -> dict[str, Periodic]:
