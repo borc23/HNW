@@ -43,6 +43,14 @@ class JobRecord(BaseModel):
     error: str | None = None
 
 
+class Interior(StrEnum):
+    """How a rental is delivered (Dutch: kaal / gestoffeerd / gemeubileerd)."""
+
+    BARE = "bare"  # no floors or curtains
+    UPHOLSTERED = "upholstered"  # floors, curtains and light fittings
+    FURNISHED = "furnished"
+
+
 class Listing(BaseModel):
     """One ad on one source, normalised from whatever the source returns."""
 
@@ -64,6 +72,25 @@ class Listing(BaseModel):
     longitude: float | None = Field(default=None, ge=-180, le=180)
     description: str | None = None
     image_url: str | None = None  # the source's main photo, hotlinked (not archived)
+    build_year: int | None = Field(default=None, ge=1000, le=2100)
+    new_build: bool | None = None  # None: the source doesn't say
+    interior: Interior | None = None
+
+
+class ListingFilters(BaseModel):
+    """What the user is looking for. Unset fields don't filter; a listing that doesn't state
+    a filtered value (e.g. no rent shown) does not match, since we can't say it fits."""
+
+    # Strip first, so a blank place fails min_length instead of matching everything.
+    # No extra="forbid": the API's query string also carries `limit`.
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    place: str | None = Field(default=None, min_length=1, max_length=100)  # city, area, postcode
+    max_rent: int | None = Field(default=None, ge=0)
+    min_rooms: int | None = Field(default=None, ge=0)
+    min_area: float | None = Field(default=None, ge=0)
+    new_build: bool | None = None  # True: only new builds; False/None: don't filter
+    interior: Interior | None = None
 
 
 class FetchedListing(BaseModel):

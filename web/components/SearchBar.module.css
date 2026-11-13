@@ -1,0 +1,192 @@
+.bar {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.searchRow {
+  display: flex;
+  gap: 8px;
+}
+
+.field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.fieldIcon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  color: var(--ink-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 16px 0 40px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-inner);
+  background: var(--bar-field);
+  color: var(--ink);
+  font: inherit;
+  transition: border-color 160ms ease-out, background-color 160ms ease-out;
+}
+
+.input::placeholder {
+  color: var(--ink-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--action);
+  background: var(--surface);
+}
+
+.searchButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: var(--action);
+  color: var(--action-ink);
+  font: 800 var(--text-md) / 1 var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms ease-out, transform 280ms var(--spring);
+}
+
+.searchButton:hover {
+  background: var(--action-hover);
+}
+
+.searchButton:active {
+  transform: scale(0.96);
+}
+
+.searchButton:disabled {
+  background: var(--line);
+  color: var(--ink-muted);
+  cursor: progress;
+  transform: none;
+}
+
+/* Chips: one scrollable row, never wrapping into a second line of the bar. */
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--bar-field);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 160ms ease-out, color 160ms ease-out, transform 280ms var(--spring);
+}
+
+.chip:active {
+  transform: scale(0.96);
+}
+
+.chip:focus-within {
+  outline: 3px solid var(--action);
+  outline-offset: 2px;
+}
+
+/* A set filter reads as selected (ink), not as an action (tomato). */
+.active {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.select {
+  padding-right: 34px;
+}
+
+.select select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.select select:focus {
+  outline: none;
+}
+
+.select option {
+  color: var(--ink);
+}
+
+.chevron {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+}
+
+.check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--action);
+}
+
+.clear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: 700 var(--text-sm) / 1 var(--font);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+/* Phone: the bar sits at the bottom, chips ride above the search field (thumb reach). */
+@media (max-width: 640px) {
+  .bar {
+    flex-direction: column-reverse;
+  }
+
+  .searchButton {
+    padding: 0 14px;
+  }
+
+  .searchLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}

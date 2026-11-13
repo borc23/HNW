@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from housing_netherlands.adapters.db import SqlJobLog, SqlListingRepository
 from housing_netherlands.adapters.db.models import JobLogRow, ListingRow
 from housing_netherlands.core import ports
-from housing_netherlands.core.models import JobStatus, ListingSummary
+from housing_netherlands.core.models import Interior, JobStatus, ListingFilters, ListingSummary
 from tests.fakes import make_listing
 
 Sessions = async_sessionmaker[AsyncSession]
@@ -123,3 +123,88 @@ async def test_job_log_unfinished_lists_only_old_open_jobs(sessions: Sessions) -
         ("old-running", "import_listing"),
     }
     assert await log.unfinished(older_than_s=3600) == []
+
+
+# --- search ---------------------------------------------------------------------------------
+
+HOMES = {
+    "zuid": dict(
+        neighbourhood="Zuidplein",
+        postcode="3083CR",
+        price_eur=915,
+        rooms=3,
+        area_m2=50.0,
+        new_build=False,
+        interior=Interior.BARE,
+    ),
+    "kop": dict(
+        neighbourhood="Kop van Zuid",
+        postcode="3072KC",
+        price_eur=1900,
+        rooms=2,
+        area_m2=76.0,
+        new_build=True,
+        interior=Interior.FURNISHED,
+    ),
+    "unknown": dict(
+        neighbourhood="100%_Centrum",
+        postcode="3011ZW",
+        price_eur=None,
+        rooms=None,
+        area_m2=None,
+        new_build=None,
+        interior=None,
+    ),
+}
+
+
+@pytest.fixture
+async def homes(repo: SqlListingRepository) -> SqlListingRepository:
+    for name, fields in HOMES.items():
+        await repo.upsert_listing(
+            make_listing(url=f"{BASE}/{name}", title=name, **fields), raw_blob_key=name
+        )
+    return repo
+
+
+async def titles(repo: SqlListingRepository, **filters) -> set[str]:
+    return {v.listing.title for v in await repo.list_listings(ListingFilters(**filters))}
+
+
+@pytest.mark.parametrize(
+    ("filters", "expected"),
+    [
+        ({}, {"zuid", "kop", "unknown"}),
+        ({"place": "zuid"}, {"zuid", "kop"}),  # neighbourhood, case-insensitive
+        ({"place": "rotterdam"}, {"zuid", "kop", "unknown"}),  # city
+        ({"place": "3083 c"}, {"zuid"}),  # postcode prefix, spaces ignored
+        ({"place": "100%_"}, {"unknown"}),  # wildcards are literal
+        ({"place": "Utrecht"}, set()),
+        ({"max_rent": 1000}, {"zuid"}),  # unknown rent never matches
+        ({"min_rooms": 3}, {"zuid"}),
+        ({"min_area": 60}, {"kop"}),
+        ({"new_build": True}, {"kop"}),
+        ({"new_build": False}, {"zuid", "kop", "unknown"}),  # False doesn't filter
+        ({"interior": Interior.BARE}, {"zuid"}),
+        ({"place": "zuid", "max_rent": 2000, "new_build": True}, {"kop"}),
+    ],
+)
+async def test_search_filters(homes: SqlListingRepository, filters: dict, expected: set) -> None:
+    assert await titles(homes, **filters) == expected
+
+
+async def test_search_fields_round_trip(homes: SqlListingRepository) -> None:
+    [view] = await homes.list_listings(ListingFilters(place="Kop van Zuid"))
+    assert (view.listing.new_build, view.listing.interior) == (True, Interior.FURNISHED)
+
+
+async def test_places_most_listed_first(homes: SqlListingRepository) -> None:
+    # Rotterdam is the city of all three homes; ties are alphabetical.
+    assert await homes.list_places() == ["Rotterdam", "100%_Centrum", "Kop van Zuid", "Zuidplein"]
+    assert await homes.list_places(limit=2) == ["Rotterdam", "100%_Centrum"]
+
+
+async def test_places_ignore_case(repo: SqlListingRepository) -> None:
+    await repo.upsert_listing(make_listing(city="Rotterdam"), raw_blob_key="a")
+    await repo.upsert_listing(make_listing(url=f"{BASE}/b", city="rotterdam"), raw_blob_key="b")
+    assert await repo.list_places() == ["Rotterdam"]

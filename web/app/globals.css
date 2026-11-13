@@ -98,10 +98,10 @@ a {
   white-space: nowrap;
 }
 
-/* Phone: keep the last card clear of the bottom bar. */
+/* Phone: keep the last card clear of the bottom bar (search row + chip row). */
 @media (max-width: 640px) {
   body {
-    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    padding-bottom: calc(152px + env(safe-area-inset-bottom));
   }
 }
 
