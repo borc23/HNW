@@ -4,90 +4,27 @@ import asyncio
 import contextlib
 import json
 import signal
-from collections.abc import MutableMapping
-from contextlib import AsyncExitStack
-from typing import Any
 
-import pytest
 from arq.jobs import Job, JobStatus
-from arq.worker import Worker, func
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from housing_netherlands.adapters.db import SqlJobLog, SqlListingRepository
+from housing_netherlands.adapters.db import SqlJobLog
 from housing_netherlands.adapters.queue_arq import ArqJobQueue
 from housing_netherlands.config import Settings
 from housing_netherlands.core.errors import SourceFetchError, SourceParseError
-from housing_netherlands.core.importing import ImportDeps, request_import
+from housing_netherlands.core.importing import request_import
 from housing_netherlands.core.jobs import reconcile_job_log
-from housing_netherlands.core.models import FetchedListing, LLMParams, QueueJobState
+from housing_netherlands.core.models import FetchedListing, QueueJobState
 from housing_netherlands.core.models import JobStatus as LogStatus
-from housing_netherlands.wiring import build_worker_settings, connect_blob_store
-from housing_netherlands.workers.main import HANDLERS
-from tests.fakes import FakeLLMClient, FakeSourceAdapter, HangingLLM, UnavailableLLM
-from tests.test_core_models import make_listing
+from housing_netherlands.wiring import connect_blob_store
+from tests.fakes import FakeLLMClient, FakeSourceAdapter, HangingLLM, UnavailableLLM, make_listing
+from tests.integration.worker_runner import Sessions, make_worker, run_worker_until_idle
 
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
 SUMMARY = json.dumps({"summary_en": "Bright flat.", "key_facts": ["EUR 915", "50 m2", "balcony"]})
 FETCHED = FetchedListing(
     listing=make_listing(), raw=b"<html>page</html>", raw_content_type="text/html"
 )
-
-Sessions = async_sessionmaker[AsyncSession]
-
-
-def make_worker(
-    settings: Settings,
-    sessions: Sessions,
-    source: FakeSourceAdapter,
-    llm: FakeLLMClient,
-    job_timeout_s: float | None = None,
-    *,
-    burst: bool = True,
-) -> Worker:
-    async def startup(state: MutableMapping[str, Any]) -> None:
-        stack = AsyncExitStack()
-        blobs = await connect_blob_store(settings)
-        stack.push_async_callback(blobs.close)
-        state["stack"] = stack
-        state["deps"] = ImportDeps(
-            listings=SqlListingRepository(sessions),
-            job_log=SqlJobLog(sessions),
-            blobs=blobs,
-            llm=llm,
-            sources=[source],
-            llm_params=LLMParams(model="fake-model"),
-            max_attempts=settings.import_max_attempts,
-            retry_base_delay_s=0.05,
-        )
-
-    async def shutdown(state: MutableMapping[str, Any]) -> None:
-        await state["stack"].aclose()
-
-    cls = build_worker_settings(
-        settings, handlers=HANDLERS, on_startup=startup, on_shutdown=shutdown
-    )
-    config = {k: v for k, v in vars(cls).items() if not k.startswith("__")}
-    if job_timeout_s is not None:  # functions carry their own timeout; rebuild them
-        config["functions"] = [
-            func(f.coroutine, name=f.name, max_tries=f.max_tries, timeout=job_timeout_s)
-            for f in config["functions"]
-        ]
-    return Worker(**config, burst=burst, poll_delay=0.05, handle_signals=False)
-
-
-async def run_worker_until_idle(
-    settings: Settings,
-    sessions: Sessions,
-    source: FakeSourceAdapter,
-    llm: FakeLLMClient,
-    job_timeout_s: float | None = None,
-) -> None:
-    worker = make_worker(settings, sessions, source, llm, job_timeout_s)
-    try:
-        await worker.main()  # burst: returns once no job is queued or deferred
-    finally:
-        await worker.close()
 
 
 async def enqueue(settings: Settings, sessions: Sessions, source: FakeSourceAdapter) -> str:
@@ -103,11 +40,6 @@ async def job_row(sessions: Sessions, job_id: str) -> tuple[str, str | None]:
         query = text("SELECT status, error FROM jobs_log WHERE id = :id")
         row = (await s.execute(query, {"id": job_id})).one()
     return row.status, row.error
-
-
-@pytest.fixture
-def settings(s3_settings: Settings, redis_test_url: str) -> Settings:
-    return s3_settings.model_copy(update={"import_max_attempts": 3})
 
 
 async def test_job_imports_listing_end_to_end(settings: Settings, sessions: Sessions) -> None:

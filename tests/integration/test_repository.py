@@ -6,7 +6,7 @@ from housing_netherlands.adapters.db import SqlJobLog, SqlListingRepository
 from housing_netherlands.adapters.db.models import JobLogRow, ListingRow
 from housing_netherlands.core import ports
 from housing_netherlands.core.models import JobStatus, ListingSummary
-from tests.test_core_models import make_listing
+from tests.fakes import make_listing
 
 Sessions = async_sessionmaker[AsyncSession]
 BASE = "https://www.huurwoningen.nl/huren/rotterdam"

@@ -2,23 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from housing_netherlands.core.models import FetchedListing, Listing, ListingSummary
-
-
-def make_listing(**overrides) -> Listing:
-    data = {
-        "source": "huurwoningen",
-        "source_listing_id": "ea81e68d",
-        "url": "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/",
-        "title": "Appartement Zuidplein",
-        "price_eur": 915,
-        "area_m2": 50.0,
-        "rooms": 3,
-        "postcode": "3083CR",
-        "city": "Rotterdam",
-        "latitude": 51.88,
-        "longitude": 4.49,
-    }
-    return Listing(**{**data, **overrides})
+from tests.fakes import make_listing
 
 
 def test_listing_is_immutable() -> None:

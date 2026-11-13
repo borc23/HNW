@@ -10,8 +10,8 @@ import pytest
 from housing_netherlands.config import Settings
 from housing_netherlands.core.summarize import build_summary_request, summarize
 from housing_netherlands.wiring import build_llm_client, extract_llm_params
+from tests.fakes import make_listing
 from tests.service_probe import tcp_target
-from tests.test_core_models import make_listing
 
 
 @pytest.fixture

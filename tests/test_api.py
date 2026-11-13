@@ -16,8 +16,9 @@ from tests.fakes import (
     FakeListingRepository,
     FakeLLMClient,
     FakeSourceAdapter,
+    make_listing,
 )
-from tests.test_core_models import make_listing
+from tests.redirects import redirected_job_id
 
 URL = "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
 
@@ -119,9 +120,8 @@ def test_page_renders_empty_state(client: TestClient) -> None:
 
 def test_form_import_redirects_to_job_status(client: TestClient, adapters: Adapters) -> None:
     response = client.post("/import", data={"url": URL}, follow_redirects=False)
-    assert response.status_code == 303
     [(_, _, job_id)] = queued(adapters)
-    assert response.headers["location"] == f"/?job={job_id}"
+    assert redirected_job_id(response) == job_id
 
     page = client.get(response.headers["location"]).text
     assert f"Job {job_id}: <strong>queued</strong>" in page
@@ -177,8 +177,7 @@ def test_form_rejects_bad_input_on_the_page(
 def test_form_with_queue_down_shows_the_failed_job(client: TestClient, adapters: Adapters) -> None:
     _break_queue(adapters)
     response = client.post("/import", data={"url": URL}, follow_redirects=False)
-    assert response.status_code == 303
-    job_id = response.headers["location"].removeprefix("/?job=")
+    job_id = redirected_job_id(response)
 
     page = client.get(response.headers["location"]).text
     assert f"Job {job_id}: <strong>failed</strong>" in page

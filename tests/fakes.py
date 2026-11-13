@@ -2,6 +2,8 @@
 
 import asyncio
 from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from housing_netherlands.core.errors import DuplicateJobError, LLMUnavailableError
@@ -19,6 +21,23 @@ from housing_netherlands.core.models import (
     QueueJobState,
     UnfinishedJob,
 )
+
+
+def make_listing(**overrides) -> Listing:
+    data = {
+        "source": "huurwoningen",
+        "source_listing_id": "ea81e68d",
+        "url": "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/",
+        "title": "Appartement Zuidplein",
+        "price_eur": 915,
+        "area_m2": 50.0,
+        "rooms": 3,
+        "postcode": "3083CR",
+        "city": "Rotterdam",
+        "latitude": 51.88,
+        "longitude": 4.49,
+    }
+    return Listing(**{**data, **overrides})
 
 
 class FakeJobQueue:
@@ -205,3 +224,37 @@ class FakeJobLog:
             for job_id, records in self.records.items()
             if records[-1][1] in open_states
         ]
+
+
+# --- HTTP doubles for HuurwoningenSource (the real parser runs on a saved page) ---------------
+
+HUURWONINGEN_DETAIL_HTML = (
+    Path(__file__).parent / "fixtures" / "huurwoningen" / "detail.html"
+).read_bytes()
+
+
+class FakeSession:
+    """Records requests and answers each with the next queued response (or exception)."""
+
+    def __init__(self, *responses: Any) -> None:
+        self.responses = list(responses)
+        self.requests: list[tuple[str, float]] = []
+        self.closed = False
+
+    async def get(self, url: str, *, timeout: float) -> Any:  # noqa: ASYNC109  # curl_cffi's API
+        self.requests.append((url, timeout))
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def respond(
+    status: int = 200,
+    content: bytes = HUURWONINGEN_DETAIL_HTML,
+    headers: dict[str, str] | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(status_code=status, content=content, headers=headers or {})
