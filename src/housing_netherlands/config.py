@@ -53,13 +53,25 @@ class Settings(BaseSettings):
     # curl_cffi browser profile, e.g. "chrome", "safari", "firefox"; change it if the site blocks
     huurwoningen_impersonate: str = "chrome"
 
+    # Seconds between requests to the site from one worker (stay low-volume during backfills)
+    huurwoningen_min_interval_s: float = Field(default=2.0, ge=0)
+
+    # Scheduled sync: every SYNC_EVERY_MIN minutes, mirror SYNC_CITY from every enabled source
+    # that can list its offer. Empty SYNC_CITY turns the sync off.
+    sync_city: str | None = "rotterdam"
+    sync_every_min: int = Field(default=15, ge=1, le=60)
+    # Background summaries: each run (every minute) works this long, one LLM call at a time.
+    summary_batch_s: float = Field(default=240.0, gt=0)
+
     # Import jobs: retryable fetch failures are retried with backoff (30 s, 60 s, ...).
     import_max_attempts: int = Field(default=3, ge=1)
     import_retry_base_delay_s: float = Field(default=30.0, ge=0)
 
-    @field_validator("storage_endpoint", "ollama_api_base", "llm_reasoning_effort", mode="before")
+    @field_validator(
+        "storage_endpoint", "ollama_api_base", "llm_reasoning_effort", "sync_city", mode="before"
+    )
     @classmethod
-    def _empty_means_unset(cls, value: object) -> object:
+    def _empty_means_unset(cls, value: object) -> object:  # e.g. SYNC_CITY= turns the sync off
         # `STORAGE_ENDPOINT=` in .env means "no custom endpoint" (e.g. real AWS S3).
         return None if isinstance(value, str) and not value.strip() else value
 

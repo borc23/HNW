@@ -1,6 +1,6 @@
 [project]
 name = "housing-netherlands"
-version = "0.1.9"
+version = "0.1.10"
 description = "Personal housing dashboard for the Dutch rental market."
 readme = "README.md"
 authors = [

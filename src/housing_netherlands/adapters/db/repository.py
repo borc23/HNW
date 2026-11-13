@@ -1,5 +1,6 @@
 """Postgres implementations of the `ListingRepository` and `JobLog` ports."""
 
+from collections.abc import Collection
 from typing import Any
 
 from sqlalchemy import ColumnElement, func, or_, select, union_all, update
@@ -15,6 +16,7 @@ from housing_netherlands.adapters.db.models import (
 from housing_netherlands.core.models import (
     JobRecord,
     JobStatus,
+    KnownListing,
     Listing,
     ListingFilters,
     ListingSummary,
@@ -37,6 +39,7 @@ _LISTING_FIELDS = (
     "build_year",
     "new_build",
     "interior",
+    "offered_since",
 )
 
 
@@ -67,6 +70,14 @@ def _conditions(f: ListingFilters) -> list[ColumnElement[bool]]:
     return conditions
 
 
+# Newest on the source first; listings without a publication date after, newest imported first.
+_NEWEST_FIRST = (
+    ListingRow.offered_since.desc().nulls_last(),
+    ListingRow.first_seen.desc(),
+    ListingRow.id.desc(),
+)
+
+
 def _point(listing: Listing) -> Any:
     if listing.latitude is None or listing.longitude is None:
         return None
@@ -85,7 +96,7 @@ class SqlListingRepository:
             .values(source=listing.source, url=listing.url, **values)
             .on_conflict_do_update(
                 constraint="uq_listings_source_url",
-                set_={**values, "last_seen": func.now()},
+                set_={**values, "last_seen": func.now(), "removed_at": None},
             )
             .returning(ListingRow.id, ListingRow.property_id)
         )
@@ -145,10 +156,65 @@ class SqlListingRepository:
         )
         async with self._sessions.begin() as session:
             await session.execute(stmt)
+            await session.execute(
+                update(ListingRow).where(ListingRow.id == listing_id).values(summary_pending=False)
+            )
+
+    async def mark_summary_pending(self, listing_id: int) -> None:
+        await self._set_summary_pending(listing_id, True)
+
+    async def clear_summary_pending(self, listing_id: int) -> None:
+        await self._set_summary_pending(listing_id, False)
+
+    async def _set_summary_pending(self, listing_id: int, pending: bool) -> None:
+        async with self._sessions.begin() as session:
+            await session.execute(
+                update(ListingRow)
+                .where(ListingRow.id == listing_id)
+                .values(summary_pending=pending)
+            )
+
+    async def pending_summaries(self, *, limit: int) -> list[int]:
+        stmt = (
+            select(ListingRow.id)
+            .where(ListingRow.summary_pending, ListingRow.removed_at.is_(None))
+            .order_by(*_NEWEST_FIRST)
+            .limit(limit)
+        )
+        async with self._sessions() as session:
+            return list((await session.scalars(stmt)).all())
+
+    async def known_listings(self, source: str) -> dict[str, KnownListing]:
+        stmt = select(ListingRow.source_listing_id, ListingRow.url, ListingRow.last_seen).where(
+            ListingRow.source == source, ListingRow.removed_at.is_(None)
+        )
+        async with self._sessions() as session:
+            return {
+                listing_id: KnownListing(url=url, last_fetched=seen)
+                for listing_id, url, seen in await session.execute(stmt)
+            }
+
+    async def mark_removed(self, source: str, urls: Collection[str]) -> int:
+        if not urls:
+            return 0
+        stmt = (
+            update(ListingRow)
+            .where(
+                ListingRow.source == source,
+                ListingRow.url.in_(list(urls)),
+                ListingRow.removed_at.is_(None),
+            )
+            .values(removed_at=func.now())
+            .returning(ListingRow.id)
+        )
+        async with self._sessions.begin() as session:
+            return len((await session.scalars(stmt)).all())
 
     async def list_places(self, *, limit: int = 100) -> list[str]:
+        active = ListingRow.removed_at.is_(None)
         names = union_all(
-            select(ListingRow.city.label("name")), select(ListingRow.neighbourhood)
+            select(ListingRow.city.label("name")).where(active),
+            select(ListingRow.neighbourhood).where(active),
         ).subquery()
         key = func.lower(names.c.name)
         stmt = (
@@ -166,6 +232,16 @@ class SqlListingRepository:
     async def list_listings(
         self, filters: ListingFilters | None = None, *, limit: int = 50
     ) -> list[ListingView]:
+        conditions = [ListingRow.removed_at.is_(None), *_conditions(filters or ListingFilters())]
+        return await self._views(conditions, limit=limit)
+
+    async def get_view(self, listing_id: int) -> ListingView | None:
+        views = await self._views([ListingRow.id == listing_id], limit=1)
+        return views[0] if views else None
+
+    async def _views(
+        self, conditions: list[ColumnElement[bool]], *, limit: int
+    ) -> list[ListingView]:
         latest = (
             select(ListingEnrichmentRow.listing_id, ListingEnrichmentRow.output_json)
             .ext(distinct_on(ListingEnrichmentRow.listing_id))
@@ -182,8 +258,8 @@ class SqlListingRepository:
             )
             .outerjoin(PropertyRow, PropertyRow.id == ListingRow.property_id)
             .outerjoin(latest, latest.c.listing_id == ListingRow.id)
-            .where(*_conditions(filters or ListingFilters()))
-            .order_by(ListingRow.last_seen.desc(), ListingRow.id.desc())
+            .where(*conditions)
+            .order_by(*_NEWEST_FIRST)
             .limit(limit)
         )
         async with self._sessions() as session:

@@ -1,6 +1,6 @@
 """Domain models shared by the API, workers and adapters."""
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Annotated
 
@@ -75,6 +75,7 @@ class Listing(BaseModel):
     build_year: int | None = Field(default=None, ge=1000, le=2100)
     new_build: bool | None = None  # None: the source doesn't say
     interior: Interior | None = None
+    offered_since: date | None = None  # when the source first published it
 
 
 class ListingFilters(BaseModel):
@@ -91,6 +92,25 @@ class ListingFilters(BaseModel):
     min_area: float | None = Field(default=None, ge=0)
     new_build: bool | None = None  # True: only new builds; False/None: don't filter
     interior: Interior | None = None
+
+
+class IndexEntry(BaseModel):
+    """One listing in a source's index of everything it currently offers."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source_listing_id: str
+    url: str
+    last_modified: datetime | None = None  # timezone-aware; None if the source doesn't say
+
+
+class KnownListing(BaseModel):
+    """A stored, not removed listing as the sync sees it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    url: str
+    last_fetched: datetime
 
 
 class FetchedListing(BaseModel):

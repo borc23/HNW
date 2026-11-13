@@ -1,6 +1,9 @@
 """HuurwoningenSource with a fake HTTP session: URL handling, parsing and error mapping."""
 
+import asyncio
+import time
 from contextlib import AsyncExitStack
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -216,3 +219,42 @@ async def test_typo_in_settings_stops_startup() -> None:
 
 def test_default_profile_is_valid() -> None:
     check_impersonate(Settings().huurwoningen_impersonate)
+
+
+# --- sitemap index and pacing ---------------------------------------------------------------
+
+SITEMAP = b"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/</loc><lastmod>2026-11-12T10:15:00+01:00</lastmod></url>
+<url><loc>https://www.huurwoningen.nl/huren/rotterdam/bb22cc33/kade/</loc><lastmod>2026-11-12T08:00:00</lastmod></url>
+<url><loc>https://www.huurwoningen.nl/huren/rotterdam/cc33dd44/hof/</loc></url>
+<url><loc>https://www.huurwoningen.nl/huren/utrecht/aa11bb22/straat/</loc></url>
+</urlset>"""
+
+
+async def test_index_lists_one_city_from_the_sitemap() -> None:
+    source, session = make_source(respond(content=SITEMAP))
+    entries = await source.index("Rotterdam")
+
+    assert session.requests == [("https://www.huurwoningen.nl/sitemap/listings.xml", 7)]
+    assert [e.source_listing_id for e in entries] == ["ea81e68d", "bb22cc33", "cc33dd44"]
+    assert entries[0].url == "https://www.huurwoningen.nl/huren/rotterdam/ea81e68d/zuidplein/"
+    assert entries[0].last_modified == datetime(2026, 11, 12, 9, 15, tzinfo=UTC)
+    assert entries[1].last_modified == datetime(2026, 11, 12, 8, 0, tzinfo=UTC)  # naive -> UTC
+    assert entries[2].last_modified is None
+    assert isinstance(source, ports.ListingIndex)
+
+
+async def test_index_errors_are_source_fetch_errors() -> None:
+    source, _ = make_source(respond(status=503))
+    with pytest.raises(SourceFetchError) as exc:
+        await source.index("rotterdam")
+    assert exc.value.retryable
+
+
+async def test_requests_are_spaced_out() -> None:
+    session = FakeSession(respond(), respond())
+    source = HuurwoningenSource(timeout_s=7, min_interval_s=0.2, session=session)
+    start = time.monotonic()
+    await asyncio.gather(source.fetch(URL), source.fetch(URL))  # two jobs at once
+    assert time.monotonic() - start >= 0.2

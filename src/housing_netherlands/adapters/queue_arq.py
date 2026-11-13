@@ -11,7 +11,7 @@ from arq.jobs import JobStatus as ArqJobStatus
 from arq.worker import Function, func
 
 from housing_netherlands.core.errors import DuplicateJobError, RetryLater
-from housing_netherlands.core.jobs import JobContext, JobHandler, Lifecycle, PeriodicTask
+from housing_netherlands.core.jobs import JobContext, JobHandler, Lifecycle, Periodic
 from housing_netherlands.core.models import QueueJobInfo, QueueJobState
 from housing_netherlands.log import bind_context, clear_context
 
@@ -67,19 +67,29 @@ def _arq_job(name: str, handler: JobHandler, *, max_tries: int, timeout_s: float
     return func(run, name=name, max_tries=max_tries, timeout=timeout_s)
 
 
-def _arq_cron(name: str, task: PeriodicTask) -> CronJob:
+def _arq_cron(name: str, periodic: Periodic) -> CronJob:
     async def run(ctx: dict[str, Any]) -> Any:
-        return await task(ctx)
+        return await periodic.task(ctx)
 
-    # every minute at :00; unique=True keeps it to one run at a time across workers
-    return cron(run, name=name, second=0, unique=True, run_at_startup=True)
+    every = periodic.every_min
+    minutes = None if every == 1 else set(range(0, 60, every))
+    # at :00 seconds; unique=True keeps each tick to one run across workers
+    return cron(
+        run,
+        name=name,
+        minute=minutes,
+        second=0,
+        unique=True,
+        run_at_startup=True,
+        timeout=periodic.timeout_s,
+    )
 
 
 def worker_settings(
     *,
     redis_url: str,
     handlers: dict[str, JobHandler],
-    periodic: dict[str, PeriodicTask] | None = None,
+    periodic: dict[str, Periodic] | None = None,
     on_startup: Lifecycle,
     on_shutdown: Lifecycle,
     max_tries: int,

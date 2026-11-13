@@ -1,5 +1,6 @@
 """Queue-independent job handler types: the worker runner adapts these to its queue backend."""
 
+import asyncio
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from typing import Any
@@ -21,8 +22,33 @@ class JobContext:
 # A handler raises `RetryLater` to be run again; any other exception fails the job.
 JobHandler = Callable[[JobContext, dict[str, Any]], Awaitable[Any]]
 Lifecycle = Callable[[MutableMapping[str, Any]], Awaitable[None]]
-# Runs once a minute in the worker, with the same per-process state as the handlers.
+# Runs on a schedule in the worker, with the same per-process state as the handlers.
 PeriodicTask = Callable[[MutableMapping[str, Any]], Awaitable[Any]]
+
+
+@dataclass(frozen=True)
+class Periodic:
+    task: PeriodicTask
+    every_min: int = 1  # minutes past the hour divisible by this (1: every minute)
+    timeout_s: float | None = None  # None: the queue's default job timeout
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.every_min <= 60:
+            raise ValueError(f"every_min must be 1-60, got {self.every_min}")
+
+
+def single_flight(task: PeriodicTask) -> PeriodicTask:
+    """Skip a run while the previous one is still going (per worker process), e.g. a long
+    summary batch when the next minute comes round. Returns None for a skipped run."""
+    lock = asyncio.Lock()
+
+    async def run(state: MutableMapping[str, Any]) -> Any:
+        if lock.locked():
+            return None
+        async with lock:
+            return await task(state)
+
+    return run
 
 
 # Rows younger than this are left alone: `request_import` logs QUEUED just before enqueueing,

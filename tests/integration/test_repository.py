@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -208,3 +210,50 @@ async def test_places_ignore_case(repo: SqlListingRepository) -> None:
     await repo.upsert_listing(make_listing(city="Rotterdam"), raw_blob_key="a")
     await repo.upsert_listing(make_listing(url=f"{BASE}/b", city="rotterdam"), raw_blob_key="b")
     assert await repo.list_places() == ["Rotterdam"]
+
+
+# --- sync: removal, summary backlog, order --------------------------------------------------
+
+
+async def test_removed_listings_are_hidden_and_come_back_on_import(
+    homes: SqlListingRepository,
+) -> None:
+    urls = {f"{BASE}/{name}" for name in HOMES}
+    known = await homes.known_listings("huurwoningen")
+    assert {k.url for k in known.values()} <= urls  # keyed by source id (shared by the fakes)
+    assert await homes.mark_removed("huurwoningen", urls) == 3
+    assert await homes.mark_removed("huurwoningen", urls) == 0  # already removed
+    assert await homes.mark_removed("other-site", urls) == 0
+    assert await homes.list_listings() == []
+    assert await homes.list_places() == []
+    assert await homes.known_listings("huurwoningen") == {}
+
+    await homes.upsert_listing(make_listing(url=f"{BASE}/zuid", title="zuid"), raw_blob_key="z")
+    assert [v.listing.title for v in await homes.list_listings()] == ["zuid"]
+    view = await homes.get_view(1)
+    assert view is not None  # removed listings are still readable by id
+
+
+async def test_summary_flag_newest_first_and_cleared_by_saving(
+    repo: SqlListingRepository,
+) -> None:
+    old = await repo.upsert_listing(make_listing(url=f"{BASE}/o"), raw_blob_key="o")
+    new = await repo.upsert_listing(make_listing(url=f"{BASE}/n"), raw_blob_key="n")
+    gone = await repo.upsert_listing(make_listing(url=f"{BASE}/g"), raw_blob_key="g")
+    for listing_id in (old, new, gone):
+        await repo.mark_summary_pending(listing_id)
+    await repo.mark_removed("huurwoningen", {f"{BASE}/o", f"{BASE}/n", f"{BASE}/g"})
+    await repo.upsert_listing(make_listing(url=f"{BASE}/o"), raw_blob_key="o")  # back
+    await repo.upsert_listing(make_listing(url=f"{BASE}/n"), raw_blob_key="n")  # back
+
+    assert await repo.pending_summaries(limit=5) == [new, old]  # not the removed one
+    await repo.save_enrichment(new, prompt_version="v", content_hash="h", model="m", output=SUMMARY)
+    await repo.clear_summary_pending(old)
+    assert await repo.pending_summaries(limit=5) == []
+
+
+async def test_feed_is_newest_on_the_source_first(repo: SqlListingRepository) -> None:
+    for name, offered in [("a", date(2026, 11, 1)), ("b", None), ("c", date(2026, 11, 12))]:
+        listing = make_listing(url=f"{BASE}/{name}", title=name, offered_since=offered)
+        await repo.upsert_listing(listing, raw_blob_key=name)
+    assert [v.listing.title for v in await repo.list_listings()] == ["c", "a", "b"]

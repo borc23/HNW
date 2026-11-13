@@ -1,11 +1,14 @@
 """Ports: the interfaces core code depends on. Adapters implement them; `wiring` picks which."""
 
+from collections.abc import Collection
 from typing import Any, Protocol, runtime_checkable
 
 from housing_netherlands.core.models import (
     FetchedListing,
+    IndexEntry,
     JobRecord,
     JobStatus,
+    KnownListing,
     Listing,
     ListingFilters,
     ListingSummary,
@@ -64,6 +67,17 @@ class SourceAdapter(Protocol):
 
 
 @runtime_checkable
+class ListingIndex(Protocol):
+    """A source that can list everything it currently offers (for scheduled sync)."""
+
+    name: str
+
+    async def index(self, city: str) -> list[IndexEntry]:
+        """Every current listing in `city`; raises `SourceFetchError` if it can't be read."""
+        ...
+
+
+@runtime_checkable
 class ListingRepository(Protocol):
     async def upsert_listing(self, listing: Listing, *, raw_blob_key: str) -> int:
         """Insert or refresh a listing (unique on source + url); return its id."""
@@ -88,6 +102,29 @@ class ListingRepository(Protocol):
     ) -> list[ListingView]:
         """Newest first, narrowed by `filters` (see `ListingFilters` for the matching rules)."""
         ...
+
+    async def get_view(self, listing_id: int) -> ListingView | None:
+        """One stored listing (also a removed one), or None if there is no such id."""
+        ...
+
+    async def known_listings(self, source: str) -> dict[str, KnownListing]:
+        """Listings of `source` that are not removed, by source listing id."""
+        ...
+
+    async def mark_removed(self, source: str, urls: Collection[str]) -> int:
+        """Hide these listings (no longer offered); return how many were newly removed.
+        Importing a listing again brings it back."""
+        ...
+
+    async def mark_summary_pending(self, listing_id: int) -> None:
+        """Flag a listing whose summary is still to be written; `save_enrichment` clears it."""
+        ...
+
+    async def pending_summaries(self, *, limit: int) -> list[int]:
+        """Ids of flagged, not removed listings, newest first."""
+        ...
+
+    async def clear_summary_pending(self, listing_id: int) -> None: ...
 
     async def list_places(self, *, limit: int = 100) -> list[str]:
         """Cities and neighbourhoods for location suggestions: most listings first, each name
