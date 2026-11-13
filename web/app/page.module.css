@@ -62,6 +62,15 @@
   color: var(--ink);
 }
 
+.noticeText {
+  max-width: 46ch;
+}
+
+.link {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .noticeTitle {
   color: var(--ink);
   font-size: var(--text-lg);

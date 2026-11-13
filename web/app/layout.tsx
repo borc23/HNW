@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import type { ReactNode } from "react";
-import { AppHeader } from "@/components/AppHeader";
 import "./globals.css";
 
 const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito", display: "swap" });
@@ -17,10 +16,7 @@ export const viewport: Viewport = { viewportFit: "cover", themeColor: "#f6efe8" 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={nunito.variable}>
-      <body>
-        <AppHeader />
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

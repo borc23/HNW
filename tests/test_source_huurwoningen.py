@@ -16,6 +16,7 @@ from housing_netherlands.adapters.source_huurwoningen import (
 from housing_netherlands.config import Settings
 from housing_netherlands.core import ports
 from housing_netherlands.core.errors import SourceFetchError, SourceParseError
+from housing_netherlands.core.models import Interior
 from housing_netherlands.wiring import build_sources
 from tests.fakes import HUURWONINGEN_DETAIL_HTML as FIXTURE
 from tests.fakes import FakeSession, respond
@@ -86,6 +87,38 @@ async def test_fetch_parses_listing_and_keeps_raw_page() -> None:
     assert listing.neighbourhood == "Zuidplein"
     assert (listing.latitude, listing.longitude) == (51.8871, 4.4887)
     assert listing.description is not None and listing.description.startswith("Licht 3-kamer")
+
+
+@pytest.mark.parametrize(
+    ("construction", "interior", "new_build", "expected_interior"),
+    [
+        ("Nieuwbouw", "Gemeubileerd", True, Interior.FURNISHED),
+        ("Bestaande bouw", "Kaal", False, Interior.BARE),
+        (" nieuwbouw ", "Gestoffeerd", True, Interior.UPHOLSTERED),
+        (None, None, None, None),
+        ("Renovatie", "Anders", None, None),  # unknown values stay unknown
+    ],
+)
+def test_search_fields_are_normalised(
+    construction: str | None,
+    interior: str | None,
+    new_build: bool | None,
+    expected_interior: Interior | None,
+) -> None:
+    details = ListingDetails(
+        id="x",
+        url=URL,
+        title="T",
+        build_year=2021,
+        construction_type=construction,
+        interior=interior,
+    )
+    listing = to_listing(details, URL)
+    assert (listing.build_year, listing.new_build, listing.interior) == (
+        2021,
+        new_build,
+        expected_interior,
+    )
 
 
 def test_main_photo_is_kept() -> None:

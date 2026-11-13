@@ -7,6 +7,7 @@ from housing_netherlands.core.models import (
     JobRecord,
     JobStatus,
     Listing,
+    ListingFilters,
     ListingSummary,
     ListingView,
     LLMMessage,
@@ -82,7 +83,15 @@ class ListingRepository(Protocol):
         output: ListingSummary,
     ) -> None: ...
 
-    async def list_listings(self, *, limit: int = 50) -> list[ListingView]: ...
+    async def list_listings(
+        self, filters: ListingFilters | None = None, *, limit: int = 50
+    ) -> list[ListingView]:
+        """Newest first, narrowed by `filters` (see `ListingFilters` for the matching rules)."""
+        ...
+
+    async def list_places(self) -> list[str]:
+        """Distinct cities and neighbourhoods of stored listings, for location suggestions."""
+        ...
 
 
 @runtime_checkable

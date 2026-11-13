@@ -1,6 +1,13 @@
 import { ArrowUpRight, ImageOff, MapPin } from "lucide-react";
 import type { ListingView } from "@/lib/api";
-import { firstSentence, formatFacts, formatPlace, formatRent, englishTitle } from "@/lib/format";
+import {
+  englishTitle,
+  firstSentence,
+  formatDetails,
+  formatFacts,
+  formatPlace,
+  formatRent,
+} from "@/lib/format";
 import styles from "./ListingCard.module.css";
 
 /** One home in the feed. Until the detail page exists, it opens the source listing. */
@@ -8,12 +15,14 @@ export function ListingCard({ view }: { view: ListingView }) {
   const { listing, summary } = view;
   const rent = formatRent(listing.price_eur);
   const facts = formatFacts(listing);
+  const details = formatDetails(listing);
   const place = formatPlace(listing);
 
   return (
     <article className={styles.card}>
       <a href={listing.url} target="_blank" rel="noreferrer" className={styles.link}>
         <div className={styles.photo}>
+          {listing.new_build && <span className={styles.tag}>New build</span>}
           {listing.image_url ? (
             // Hotlinked source photo; next/image would need every source host configured.
             <img src={listing.image_url} alt="" loading="lazy" referrerPolicy="no-referrer" />
@@ -36,6 +45,7 @@ export function ListingCard({ view }: { view: ListingView }) {
             {summary ? firstSentence(summary.summary_en) : "English summary on its way."}
           </p>
           {facts && <p className={styles.facts}>{facts}</p>}
+          {details && <p className={styles.details}>{details}</p>}
           <div className={styles.footer}>
             <p className={styles.rent}>
               {rent ? (

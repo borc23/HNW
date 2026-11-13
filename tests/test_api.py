@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from housing_netherlands.api.app import create_app
-from housing_netherlands.core.models import JobStatus, ListingSummary
+from housing_netherlands.core.models import Interior, JobStatus, ListingFilters, ListingSummary
 from housing_netherlands.wiring import Adapters
 from tests.fakes import (
     FakeBlobStore,
@@ -101,6 +101,33 @@ async def test_listings_endpoint(client: TestClient, adapters: Adapters) -> None
     assert item["id"] == listing_id
     assert item["listing"]["title"] == "Appartement Zuidplein"
     assert item["summary"]["key_facts"] == ["EUR 915", "50 m2", "balcony"]
+
+
+def test_listings_endpoint_passes_filters(client: TestClient, adapters: Adapters) -> None:
+    query = (
+        "place=Zuidplein&max_rent=1500&min_rooms=2&min_area=40&new_build=true&interior=furnished"
+    )
+    assert client.get(f"/api/listings?limit=10&{query}").status_code == 200
+    assert adapters.listings.last_filters == ListingFilters(  # type: ignore[attr-defined]
+        place="Zuidplein",
+        max_rent=1500,
+        min_rooms=2,
+        min_area=40,
+        new_build=True,
+        interior=Interior.FURNISHED,
+    )
+
+
+@pytest.mark.parametrize("query", ["interior=sofa", "max_rent=-1", "min_rooms=two", "place="])
+def test_listings_endpoint_rejects_bad_filters(client: TestClient, query: str) -> None:
+    assert client.get(f"/api/listings?{query}").status_code == 422
+
+
+async def test_places_endpoint(client: TestClient, adapters: Adapters) -> None:
+    await adapters.listings.upsert_listing(
+        make_listing(neighbourhood="Zuidplein"), raw_blob_key="k"
+    )
+    assert client.get("/api/places").json() == ["Rotterdam", "Zuidplein"]
 
 
 @pytest.mark.parametrize("limit", [0, 201])

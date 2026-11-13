@@ -1,4 +1,5 @@
 import type { Listing } from "@/lib/api";
+import { INTERIORS } from "@/lib/filters";
 
 const euros = new Intl.NumberFormat("en-NL", {
   style: "currency",
@@ -17,6 +18,13 @@ export function formatFacts({ area_m2, rooms, bedrooms }: Listing): string {
     rooms !== null && plural(rooms, "room"),
     bedrooms !== null && plural(bedrooms, "bedroom"),
   ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** "Built 1962 · Furnished": the building and how it's delivered. */
+export function formatDetails({ build_year, interior }: Listing): string {
+  return [build_year !== null && `Built ${build_year}`, interior !== null && INTERIORS[interior]]
     .filter(Boolean)
     .join(" · ");
 }

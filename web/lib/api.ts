@@ -1,18 +1,11 @@
 /**
- * Typed client for the FastAPI backend. Server-only: the browser talks to Next server actions,
- * which call this, so the API needs no CORS and its URL stays configuration.
+ * Typed client for the FastAPI backend. Server-only: pages render on the Next server, so the
+ * API needs no CORS and its URL stays configuration.
  */
 import "server-only";
+import { toQuery, type Filters, type Interior } from "@/lib/filters";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
-
-export type JobStatus = "queued" | "running" | "succeeded" | "failed";
-
-export interface Job {
-  job_id: string;
-  status: JobStatus;
-  error: string | null;
-}
 
 export interface Listing {
   url: string;
@@ -25,6 +18,9 @@ export interface Listing {
   city: string | null;
   neighbourhood: string | null;
   image_url: string | null;
+  build_year: number | null;
+  new_build: boolean | null;
+  interior: Interior | null;
 }
 
 export interface ListingView {
@@ -43,14 +39,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
-      ...init,
-      cache: "no-store",
-      headers: { "content-type": "application/json", ...init?.headers },
-    });
+    response = await fetch(`${API_URL}${path}`, { cache: "no-store" });
   } catch {
     throw new ApiError("We can't reach the NL Housing server right now. Is it running?");
   }
@@ -69,11 +61,9 @@ function errorMessage(body: unknown): string | null {
 }
 
 export const api = {
-  listListings: (limit = 50) => request<ListingView[]>(`/api/listings?limit=${limit}`),
-  getJob: (jobId: string) => request<Job>(`/api/jobs/${encodeURIComponent(jobId)}`),
-  importListing: (url: string) =>
-    request<{ job_id: string }>("/api/listings/import", {
-      method: "POST",
-      body: JSON.stringify({ url }),
-    }),
+  listListings: (filters: Filters = {}, limit = 50) => {
+    const query = toQuery(filters);
+    return request<ListingView[]>(`/api/listings?limit=${limit}${query && `&${query}`}`);
+  },
+  listPlaces: () => request<string[]>("/api/places"),
 };

@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import ColumnElement, func, or_, select, union, update
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,6 +16,7 @@ from housing_netherlands.core.models import (
     JobRecord,
     JobStatus,
     Listing,
+    ListingFilters,
     ListingSummary,
     ListingView,
     UnfinishedJob,
@@ -33,7 +34,37 @@ _LISTING_FIELDS = (
     "neighbourhood",
     "description",
     "image_url",
+    "build_year",
+    "new_build",
+    "interior",
 )
+
+
+def _conditions(f: ListingFilters) -> list[ColumnElement[bool]]:
+    """SQL for `ListingFilters`; a NULL column never satisfies a comparison, so listings that
+    don't state a filtered value drop out, as the model documents."""
+    row = ListingRow
+    conditions: list[ColumnElement[bool]] = []
+    if f.place:
+        place = f.place.strip()
+        conditions.append(
+            or_(
+                row.city.icontains(place, autoescape=True),
+                row.neighbourhood.icontains(place, autoescape=True),
+                row.postcode.istartswith(place.replace(" ", ""), autoescape=True),
+            )
+        )
+    if f.max_rent is not None:
+        conditions.append(row.price_eur <= f.max_rent)
+    if f.min_rooms is not None:
+        conditions.append(row.rooms >= f.min_rooms)
+    if f.min_area is not None:
+        conditions.append(row.area_m2 >= f.min_area)
+    if f.new_build:
+        conditions.append(row.new_build.is_(True))
+    if f.interior is not None:
+        conditions.append(row.interior == f.interior.value)
+    return conditions
 
 
 def _point(listing: Listing) -> Any:
@@ -115,7 +146,17 @@ class SqlListingRepository:
         async with self._sessions.begin() as session:
             await session.execute(stmt)
 
-    async def list_listings(self, *, limit: int = 50) -> list[ListingView]:
+    async def list_places(self) -> list[str]:
+        names = union(
+            select(ListingRow.city.label("name")), select(ListingRow.neighbourhood)
+        ).subquery()
+        stmt = select(names.c.name).where(names.c.name.is_not(None)).order_by(names.c.name)
+        async with self._sessions() as session:
+            return list((await session.scalars(stmt)).all())
+
+    async def list_listings(
+        self, filters: ListingFilters | None = None, *, limit: int = 50
+    ) -> list[ListingView]:
         latest = (
             select(ListingEnrichmentRow.listing_id, ListingEnrichmentRow.output_json)
             .ext(distinct_on(ListingEnrichmentRow.listing_id))
@@ -132,6 +173,7 @@ class SqlListingRepository:
             )
             .outerjoin(PropertyRow, PropertyRow.id == ListingRow.property_id)
             .outerjoin(latest, latest.c.listing_id == ListingRow.id)
+            .where(*_conditions(filters or ListingFilters()))
             .order_by(ListingRow.last_seen.desc(), ListingRow.id.desc())
             .limit(limit)
         )

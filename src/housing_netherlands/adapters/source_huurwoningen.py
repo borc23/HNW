@@ -15,7 +15,7 @@ from pyhuurwoningen.models import ListingDetails
 from pyhuurwoningen.parsing import BASE_URL, DETAIL_PATH, parse_detail_page
 
 from housing_netherlands.core.errors import SourceFetchError, SourceParseError
-from housing_netherlands.core.models import FetchedListing, Listing
+from housing_netherlands.core.models import FetchedListing, Interior, Listing
 
 NAME = "huurwoningen"
 HOSTS = frozenset({"www.huurwoningen.nl", "huurwoningen.nl"})
@@ -39,6 +39,19 @@ def canonical_url(url: str) -> str | None:
     return f"{BASE_URL}/huren/{city}/{listing_id}/{slug}/"
 
 
+# The site's Dutch values, lower-cased.
+_INTERIORS = {
+    "kaal": Interior.BARE,
+    "gestoffeerd": Interior.UPHOLSTERED,
+    "gemeubileerd": Interior.FURNISHED,
+}
+_CONSTRUCTION = {"nieuwbouw": True, "bestaande bouw": False}
+
+
+def _lookup[T](table: dict[str, T], value: str | None) -> T | None:
+    return table.get(value.strip().lower()) if value else None
+
+
 def to_listing(details: ListingDetails, url: str) -> Listing:
     locality = " ".join(p for p in (details.postcode, details.city) if p)
     return Listing(
@@ -59,6 +72,9 @@ def to_listing(details: ListingDetails, url: str) -> Listing:
         longitude=details.longitude,
         description=details.description,
         image_url=details.image_url,
+        build_year=details.build_year,
+        new_build=_lookup(_CONSTRUCTION, details.construction_type),
+        interior=_lookup(_INTERIORS, details.interior),
     )
 
 

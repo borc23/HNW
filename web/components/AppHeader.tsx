@@ -1,13 +1,13 @@
 import { House } from "lucide-react";
 import Link from "next/link";
-import { ImportBox } from "./ImportBox";
+import type { ReactNode } from "react";
 import styles from "./AppHeader.module.css";
 
 /**
- * The floating bar: brand plus the paste-a-link import, always within reach.
+ * The floating bar: brand plus the page's tools (search and filters), always within reach.
  * Pinned to the top on wider screens, to the bottom (thumb zone) on phones.
  */
-export function AppHeader() {
+export function AppHeader({ children }: { children: ReactNode }) {
   return (
     <header className={styles.bar}>
       <Link href="/" className={styles.brand} aria-label="NL Housing, home">
@@ -16,7 +16,7 @@ export function AppHeader() {
         </span>
         <span className={styles.name}>NL Housing</span>
       </Link>
-      <ImportBox />
+      {children}
     </header>
   );
 }

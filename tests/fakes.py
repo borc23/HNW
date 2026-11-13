@@ -12,6 +12,7 @@ from housing_netherlands.core.models import (
     JobRecord,
     JobStatus,
     Listing,
+    ListingFilters,
     ListingSummary,
     ListingView,
     LLMMessage,
@@ -166,6 +167,7 @@ class FakeListingRepository:
     def __init__(self) -> None:
         self.listings: dict[tuple[str, str], tuple[int, Listing, str]] = {}
         self.enrichments: dict[tuple[int, str, str], tuple[str, ListingSummary]] = {}
+        self.last_filters: ListingFilters | None = None
 
     async def upsert_listing(self, listing: Listing, *, raw_blob_key: str) -> int:
         key = (listing.source, listing.url)
@@ -190,7 +192,11 @@ class FakeListingRepository:
     ) -> None:
         self.enrichments[(listing_id, prompt_version, content_hash)] = (model, output)
 
-    async def list_listings(self, *, limit: int = 50) -> list[ListingView]:
+    async def list_listings(
+        self, filters: ListingFilters | None = None, *, limit: int = 50
+    ) -> list[ListingView]:
+        # Filtering itself is tested against Postgres; the fake only records what was asked.
+        self.last_filters = filters
         now = datetime.now(UTC)
         summaries = {lid: out for (lid, _, _), (_, out) in self.enrichments.items()}
         return [
@@ -199,6 +205,12 @@ class FakeListingRepository:
             )
             for lid, listing, _ in self.listings.values()
         ][:limit]
+
+    async def list_places(self) -> list[str]:
+        names = {
+            n for _, item, _ in self.listings.values() for n in (item.city, item.neighbourhood)
+        }
+        return sorted(n for n in names if n)
 
 
 class FakeJobLog:

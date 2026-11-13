@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from housing_netherlands.config import get_settings
 from housing_netherlands.core.errors import EnqueueFailedError, UnsupportedUrlError
 from housing_netherlands.core.importing import request_import
-from housing_netherlands.core.models import JobRecord, ListingView
+from housing_netherlands.core.models import JobRecord, ListingFilters, ListingView
 from housing_netherlands.log import (
     bind_context,
     clear_context,
@@ -110,9 +110,15 @@ def create_app(adapters_factory: AdaptersFactory | None = None) -> FastAPI:
 
     @app.get("/api/listings")
     async def list_listings(
-        request: Request, limit: Annotated[int, Query(ge=1, le=200)] = 50
+        request: Request,
+        filters: Annotated[ListingFilters, Query()],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
     ) -> list[ListingView]:
-        return await adapters(request).listings.list_listings(limit=limit)
+        return await adapters(request).listings.list_listings(filters, limit=limit)
+
+    @app.get("/api/places")
+    async def list_places(request: Request) -> list[str]:
+        return await adapters(request).listings.list_places()
 
     # --- plain HTML page for trying it out ------------------------------------------------
 
