@@ -1,6 +1,6 @@
 [project]
 name = "housing-netherlands"
-version = "0.1.5"
+version = "0.1.6"
 description = "Personal housing dashboard for the Dutch rental market."
 readme = "README.md"
 authors = [
@@ -12,10 +12,12 @@ dependencies = [
     "alembic>=1.20.1",
     "arq>=0.28.0",
     "asyncpg>=0.32.0",
+    "curl-cffi>=0.11",
     "geoalchemy2>=0.21.0",
     "litellm==1.106.6",
     "pydantic>=2.14.3",
     "pydantic-settings>=2.16.2",
+    "pyhuurwoningen>=1.0.1",
     "sqlalchemy[asyncio]>=2.1.8",
     "structlog>=26.1.0",
 ]

@@ -29,11 +29,18 @@ class FakeClosable:
             raise RuntimeError("close failed")
 
 
+class FakeSource(FakeClosable):
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__()
+        self.kwargs = kwargs
+
+
 @dataclass
 class Fakes:
     engine: FakeEngine
     queue: FakeClosable
     blobs: FakeClosable
+    sources: list[FakeSource]
 
 
 def _returning(obj: object):
@@ -52,17 +59,33 @@ def _raising(exc: Exception):
 
 @pytest.fixture
 def fakes(monkeypatch: pytest.MonkeyPatch) -> Fakes:
-    f = Fakes(FakeEngine(), FakeClosable(), FakeClosable())
+    f = Fakes(FakeEngine(), FakeClosable(), FakeClosable(), [])
     monkeypatch.setattr(wiring, "create_engine", lambda url: f.engine)
     monkeypatch.setattr(wiring.ArqJobQueue, "connect", _returning(f.queue))
     monkeypatch.setattr(wiring.S3BlobStore, "connect", _returning(f.blobs))
+
+    def make_source(**kwargs: object) -> FakeSource:
+        f.sources.append(FakeSource(**kwargs))
+        return f.sources[-1]
+
+    monkeypatch.setattr(wiring, "HuurwoningenSource", make_source)
     return f
 
 
 async def test_everything_closed_on_normal_exit(fakes: Fakes) -> None:
-    async with wiring.build_adapters(Settings()) as adapters:
+    settings = Settings(huurwoningen_timeout_s=5, huurwoningen_impersonate="safari")
+    async with wiring.build_adapters(settings) as adapters:
         assert adapters.blobs is fakes.blobs
+        assert adapters.sources == tuple(fakes.sources)
+        assert fakes.sources[0].kwargs == {"timeout_s": 5, "impersonate": "safari"}
     assert fakes.blobs.closed and fakes.queue.closed and fakes.engine.disposed
+    assert fakes.sources[0].closed
+
+
+async def test_no_sources_when_none_enabled(fakes: Fakes) -> None:
+    async with wiring.build_adapters(Settings(sources_enabled=[])) as adapters:
+        assert adapters.sources == ()
+    assert fakes.sources == []
 
 
 async def test_engine_disposed_when_queue_connect_fails(

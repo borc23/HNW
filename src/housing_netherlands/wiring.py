@@ -11,6 +11,7 @@ from housing_netherlands.adapters.db import (
     create_session_factory,
 )
 from housing_netherlands.adapters.queue_arq import ArqJobQueue
+from housing_netherlands.adapters.source_huurwoningen import HuurwoningenSource
 from housing_netherlands.config import Settings
 from housing_netherlands.core.models import LLMParams
 from housing_netherlands.core.ports import (
@@ -19,6 +20,7 @@ from housing_netherlands.core.ports import (
     JobQueue,
     ListingRepository,
     LLMClient,
+    SourceAdapter,
 )
 
 if TYPE_CHECKING:
@@ -32,6 +34,25 @@ class Adapters:
     blobs: BlobStore
     queue: JobQueue
     llm: LLMClient
+    sources: tuple[SourceAdapter, ...]  # only those in SOURCES_ENABLED, in that order
+
+
+def build_sources(settings: Settings, stack: AsyncExitStack) -> tuple[SourceAdapter, ...]:
+    """Create the enabled source adapters; their cleanup is registered on `stack`."""
+    sources: list[SourceAdapter] = []
+    for name in settings.sources_enabled:
+        match name:
+            case "huurwoningen":
+                source = HuurwoningenSource(
+                    timeout_s=settings.huurwoningen_timeout_s,
+                    impersonate=settings.huurwoningen_impersonate,
+                )
+                stack.push_async_callback(source.close)
+                sources.append(source)
+            case _:
+                # Type checkers flag this if a source is added to SourceName without a case.
+                assert_never(name)
+    return tuple(sources)
 
 
 async def connect_blob_store(settings: Settings) -> S3BlobStore:
@@ -96,4 +117,5 @@ async def build_adapters(settings: Settings) -> AsyncIterator[Adapters]:
             blobs=blobs,
             queue=queue,
             llm=build_llm_client(settings),
+            sources=build_sources(settings, stack),
         )

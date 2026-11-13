@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from housing_netherlands.config import Settings
 
@@ -19,8 +20,14 @@ def test_defaults_target_local_stack() -> None:
 
 
 def test_sources_enabled_parses_comma_separated_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SOURCES_ENABLED", " Huurwoningen , ,pasted_link")
-    assert Settings().sources_enabled == ["huurwoningen", "pasted_link"]
+    monkeypatch.setenv("SOURCES_ENABLED", " Huurwoningen , ,huurwoningen")
+    assert Settings().sources_enabled == ["huurwoningen"]
+
+
+def test_unknown_source_fails_at_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SOURCES_ENABLED", "huurwoningen,pararius")
+    with pytest.raises(ValidationError, match="pararius"):
+        Settings()
 
 
 def test_sources_enabled_can_be_empty(monkeypatch: pytest.MonkeyPatch) -> None:
